@@ -114,6 +114,21 @@ namespace zen {
 
         void initializeLogicalDevice();
     };
+
+    struct Image {
+        VkImage image = VK_NULL_HANDLE;
+        VkImageView view = VK_NULL_HANDLE;
+    };
+
+    class Presentable {
+    public:
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+        std::vector<Image> images = {};
+        VkFormat format = VK_FORMAT_UNDEFINED;
+        VkExtent2D extent = {0, 0};
+
+        Presentable(Device device)
+    };
 };
 
 #endif //ZENITH_ZENITH_VULKAN_H
