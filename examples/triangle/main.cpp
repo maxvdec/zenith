@@ -7,9 +7,20 @@
 * Copyright (c) 2025 Max Van den Eynde
 */
 
-#include <zenith/lib.h>
+#include <zenith/zenith.h>
+#include <zenith/window.h>
+#include <glfw/glfw3.h>
 
 int main() {
-    say_hi();
+    zen::glfw::WindowConfiguration config{};
+    config.name = "Zenith Triangle Example";
+    config.width = 800;
+    config.height = 600;
+    zen::glfw::Window window(config);
+    window.init();
+
+    while (!window.shouldClose()) {
+
+    }
     return 0;
 }
