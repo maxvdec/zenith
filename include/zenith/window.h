@@ -42,6 +42,7 @@ namespace zen::glfw {
         bool enableValidationLayers = false;
         std::array<int, 3> applicationVersion = {1, 0, 0};
         std::array<int, 3> engineVersion = {1, 0, 0};
+        bool enableDebugMessenger = false;
 
         void ensureIntegrity() const;
     };
@@ -63,6 +64,14 @@ namespace zen::glfw {
 
     private:
         void initializeVulkan();
+
+        void initializeDebugMessenger() const;
+
+        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+                VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                VkDebugUtilsMessageTypeFlagsEXT type,
+                const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
+                void *userData);
     };
 }
 

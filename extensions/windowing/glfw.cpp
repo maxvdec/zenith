@@ -84,6 +84,44 @@ void VkInitializer::initialize() {
     initializeVulkan(); // We pass the window to the Vulkan initialization function
 }
 
+VKAPI_ATTR VkBool32 VKAPI_CALL VkInitializer::debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+        VkDebugUtilsMessageTypeFlagsEXT type,
+        const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
+        void *userData) {
+    // Unused parameters to avoid warnings
+    (void) severity;
+    (void) type;
+    (void) userData;
+    std::cout << "[VULKAN DEBUG] " << callbackData->pMessage << std::endl;
+    return VK_FALSE;
+}
+
+void VkInitializer::initializeDebugMessenger() const {
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+    debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debugCreateInfo.messageSeverity =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debugCreateInfo.messageType =
+            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debugCreateInfo.pfnUserCallback = VkInitializer::debugCallback;
+
+    auto createUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+    if (createUtilsMessengerEXT == nullptr) {
+        throw std::runtime_error("Failed to load vkCreateDebugUtilsMessengerEXT function");
+    }
+    if (createUtilsMessengerEXT(instance, &debugCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create debug messenger. Error: " +
+                                 zen::getVulkanErrorString(VK_ERROR_INITIALIZATION_FAILED));
+    }
+}
+
 void VkInitializer::initializeVulkan() {
     // We first check if MoltenVK is available
     if (!isMoltenVkAvailable()) {
@@ -118,8 +156,23 @@ void VkInitializer::initializeVulkan() {
     std::vector<const char *> enabledExtensions(extensions, extensions + extensionCount);
     if (!config.extraExtensions.empty()) {
         for (const auto &ext: config.extraExtensions) {
+            CoreVulkanExtension extension(ext);
+            if (!extension.exists()) {
+                std::cerr << "Warning: Vulkan extension " << ext
+                          << " does not exist. Skipping." << std::endl;
+                continue;
+            }
             enabledExtensions.push_back(ext.c_str());
         }
+    }
+
+    if (config.enableDebugMessenger) {
+        // If the debug messenger is enabled, we add the debug utils extension
+        if (!zen::CoreVulkanExtension{"VK_EXT_debug_utils"}.exists()) {
+            std::cerr << "Warning: VK_EXT_debug_utils extension not found. Debug messenger will not be enabled."
+                      << std::endl;
+        }
+        enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
 
 #ifdef __APPLE__
@@ -169,13 +222,18 @@ void VkInitializer::initializeVulkan() {
         }
     }
 
+    // And finally, we create the Vulkan instance
     VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
 
-    // And finally, we create the Vulkan instance
     if (result != VK_SUCCESS) {
         glfwDestroyWindow(*window);
         glfwTerminate();
         throw std::runtime_error("Failed to create Vulkan instance. Error: " + zen::getVulkanErrorString(result));
+    }
+
+    if (config.enableDebugMessenger) {
+        // If the debug messenger is enabled, we initialize it
+        initializeDebugMessenger();
     }
 
     result = glfwCreateWindowSurface(instance, *window, nullptr, &surface);

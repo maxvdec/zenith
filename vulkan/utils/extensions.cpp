@@ -113,5 +113,23 @@ bool zen::isMoltenVkAvailable() {
     return false;
 }
 
+bool CoreVulkanExtension::exists() const {
+    if (name.empty()) {
+        return false; // If the name is empty, we return false
+    }
+
+    uint32_t extensionCount;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+
+    for (const auto &ext: availableExtensions) {
+        if (name == ext.extensionName) {
+            return true;
+        }
+    }
+    return false;
+}
+
 #endif
 

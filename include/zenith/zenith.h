@@ -12,31 +12,7 @@
 
 #ifdef ZENITH_VULKAN
 
-#include <vulkan/vulkan.hpp>
-
-namespace zen {
-    class CoreValidationLayer {
-    public:
-        std::string name;
-
-        [[nodiscard]] bool exists() const;
-
-        void enable(VkInstanceCreateInfo *createInfo) const;
-
-        static std::vector<CoreValidationLayer> getDeviceLayers();
-    };
-
-    class CoreVulkanExtension {
-    public:
-        std::string name;
-
-        static std::vector<CoreVulkanExtension> getDeviceExtensions();
-    };
-
-    std::string getVulkanErrorString(VkResult error);
-
-    bool isMoltenVkAvailable();
-};
+#include <zenith/zenith_vulkan.h>
 
 #endif
 

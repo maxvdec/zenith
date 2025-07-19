@@ -16,6 +16,7 @@ int main() {
     config.name = "Zenith Triangle Example";
     config.width = 800;
     config.height = 600;
+    config.enableDebugMessenger = true;
     zen::glfw::Window window(config);
     window.init();
 
