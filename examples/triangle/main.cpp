@@ -20,6 +20,8 @@ int main() {
     zen::glfw::Window window(config);
     window.init();
 
+    auto device = zen::Device::makeDefaultDevice(window.acquireInstance());
+
     while (!window.shouldClose()) {
 
     }

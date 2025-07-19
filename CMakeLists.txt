@@ -15,7 +15,8 @@ find_package(glm REQUIRED)
 add_library(Zenith SHARED
         extensions/windowing/glfw.cpp
         vulkan/utils/extensions.cpp
-        vulkan/utils/errors.cpp)
+        vulkan/utils/errors.cpp
+        vulkan/device.cpp)
 
 target_include_directories(Zenith PUBLIC include)
 target_compile_options(Zenith PRIVATE

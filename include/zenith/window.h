@@ -15,6 +15,7 @@
 #include <array>
 #include <vector>
 #include <optional>
+#include <zenith/zenith.h>
 
 #ifndef ZENITH_EXT_WINDOWING
 #error "To use this header, you must enable the Zenith Windowing extension when compiling or downloading the toolkit."
@@ -93,6 +94,10 @@ namespace zen::glfw {
 
         [[nodiscard]] inline bool shouldClose() const {
             return vulkan.shouldClose();
+        }
+
+        [[nodiscard]] inline Instance acquireInstance() const {
+            return {vulkan.instance, vulkan.surface};
         }
 
 #endif

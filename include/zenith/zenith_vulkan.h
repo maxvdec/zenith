@@ -16,6 +16,13 @@
 #include <functional>
 
 namespace zen {
+    struct Instance {
+        VkInstance instance;
+        VkSurfaceKHR surface;
+
+        Instance(VkInstance instance, VkSurfaceKHR surface) : instance(instance), surface(surface) {};
+    };
+
     class CoreValidationLayer {
     public:
         std::string name;
@@ -40,22 +47,56 @@ namespace zen {
 
     bool isMoltenVkAvailable();
 
-#define DEVICE_SCORE_FUNCTION(name) \
-    float name(const VkPhysicalDevice &physicalDevice, const VkSurfaceKHR &surface)
+    class Device;
 
-    DEVICE_SCORE_FUNCTION(defaultDeviceScoreFunction);
+    using DeviceSelector = std::function<float(const Device &)>;
+
+    class DevicePicker {
+    public:
+        DeviceSelector selector;
+
+        static DevicePicker makeDefaultPicker();
+
+        explicit DevicePicker(DeviceSelector selector) : selector(std::move(selector)) {};
+    };
+
+    enum class DeviceCapabilities {
+        Graphics,
+        Compute,
+        Transfer,
+        Present,
+    };
+
+    class CoreQueue {
+    public:
+        VkQueue queue = VK_NULL_HANDLE;
+    };
 
     class Device {
     public:
-        static Device makeDefaultDevice();
+        DevicePicker picker = DevicePicker::makeDefaultPicker();
 
-        Device() = default;
+        static std::unique_ptr<Device> makeDefaultDevice(Instance instance);
 
-    private:
+        explicit Device(Instance instance, DevicePicker picker = DevicePicker::makeDefaultPicker())
+                : picker(std::move(picker)), instance(instance) {}
+
+        [[nodiscard]] bool supportsExtensions(const std::vector<std::string> &requiredExtensions = {}) const;
+
+        [[nodiscard]] bool supportsSwapchain() const;
+
+        [[nodiscard]] bool hasRequiredQueues() const;
+
+        [[nodiscard]] bool supportsRaytracing() const;
+
+        void init();
+
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         VkPhysicalDeviceProperties physicalDeviceProperties{};
         VkPhysicalDeviceFeatures physicalDeviceFeatures{};
         VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties{};
+    private:
+        Instance instance;
     };
 };
 
