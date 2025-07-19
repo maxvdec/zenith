@@ -109,18 +109,24 @@ void Device::init() {
 
     // We need to find the queue families that support graphics, compute, and transfer operations
     findQueueFamilies();
+
+    // We initialize the logical device with the queue families we found
+    initializeLogicalDevice();
 }
 
 void Device::findQueueFamilies() {
-    // We need to find the queue families that support graphics, compute, and transfer operations
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
+    queues.clear(); // Make sure it's empty
+
     for (uint32_t i = 0; i < queueFamilyCount; ++i) {
         const auto &queueFamily = queueFamilies[i];
         CoreQueue queue;
+        queue.familyIndex = i; // Set the family index
+
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             queue.capabilities.push_back(DeviceCapabilities::Graphics);
         }
@@ -136,6 +142,8 @@ void Device::findQueueFamilies() {
         if (present) {
             queue.capabilities.push_back(DeviceCapabilities::Present);
         }
+
+        queues.push_back(queue);
     }
 
     if (queueFamilies.empty()) {
@@ -189,12 +197,34 @@ void Device::initializeLogicalDevice() {
     deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
     deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures; // We set the physical device features
-    deviceCreateInfo.enabledExtensionCount = extensions.count();
+    deviceCreateInfo.enabledExtensionCount = extensions.size();
     deviceCreateInfo.ppEnabledExtensionNames = extensions.data();
 
+    VkResult result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &logicalDevice);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create logical device. Error: " + zen::getVulkanErrorString(result));
+    }
 }
 
+std::vector<CoreQueue> Device::getQueueFromCapability(zen::DeviceCapabilities capability) {
+    std::vector<CoreQueue> result;
+    for (const auto &queue: queues) {
+        if (std::find(queue.capabilities.begin(), queue.capabilities.end(), capability) != queue.capabilities.end()) {
+            result.push_back(queue);
+        }
+    }
+    return result;
+}
+
+
 bool Device::supportsExtensions(const std::vector<std::string> &requiredExtensions) const {
+    std::vector<std::string> extensionsToCheck = requiredExtensions;
+    if (extensionsToCheck.empty()) {
+        for (const char *ext: extensions) {
+            extensionsToCheck.push_back(std::string(ext));
+        }
+    }
+
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
@@ -205,7 +235,7 @@ bool Device::supportsExtensions(const std::vector<std::string> &requiredExtensio
         available.insert(ext.extensionName);
     }
 
-    for (const auto &req: requiredExtensions) {
+    for (const auto &req: extensionsToCheck) {
         if (available.find(req) == available.end()) {
             return false;
         }
@@ -220,14 +250,15 @@ bool Device::supportsSwapchain() const {
 }
 
 bool Device::hasRequiredQueues() const {
-    // We check if the device has the required queues for graphics, compute, and transfer
-    VkQueueFamilyProperties queueFamilies[3];
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-    if (queueFamilyCount < 3) {
-        return false; // Not enough queue families
+
+    if (queueFamilyCount == 0) {
+        return false;
     }
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     bool hasGraphics = false;
     bool hasCompute = false;
@@ -247,6 +278,7 @@ bool Device::hasRequiredQueues() const {
 
     return hasGraphics && hasCompute && hasTransfer;
 }
+
 
 bool Device::supportsRaytracing() const {
     // We check if the device supports ray tracing

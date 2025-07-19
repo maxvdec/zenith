@@ -101,17 +101,16 @@ namespace zen {
         VkDevice logicalDevice = VK_NULL_HANDLE;
         std::vector<CoreQueue> queues;
 
-        std::vector<std::string> extensions = {
+        std::vector<const char *> extensions = {
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
 
-        CoreQueue getQueueFromCapability(DeviceCapabilities capability);
+        std::vector<CoreQueue> getQueueFromCapability(DeviceCapabilities capability);
 
     private:
         Instance instance;
 
         void findQueueFamilies();
-
-        void retrieveQueues();
 
         void initializeLogicalDevice();
     };
