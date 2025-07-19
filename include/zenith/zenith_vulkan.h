@@ -70,6 +70,8 @@ namespace zen {
     class CoreQueue {
     public:
         VkQueue queue = VK_NULL_HANDLE;
+        uint32_t familyIndex = 0;
+        std::vector<DeviceCapabilities> capabilities = {};
     };
 
     class Device {
@@ -95,8 +97,23 @@ namespace zen {
         VkPhysicalDeviceProperties physicalDeviceProperties{};
         VkPhysicalDeviceFeatures physicalDeviceFeatures{};
         VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties{};
+
+        VkDevice logicalDevice = VK_NULL_HANDLE;
+        std::vector<CoreQueue> queues;
+
+        std::vector<std::string> extensions = {
+        };
+
+        CoreQueue getQueueFromCapability(DeviceCapabilities capability);
+
     private:
         Instance instance;
+
+        void findQueueFamilies();
+
+        void retrieveQueues();
+
+        void initializeLogicalDevice();
     };
 };
 

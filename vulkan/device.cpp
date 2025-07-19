@@ -106,6 +106,92 @@ void Device::init() {
     // Once initialized the physical device, we can retrieve its properties and features
     vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
     vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
+
+    // We need to find the queue families that support graphics, compute, and transfer operations
+    findQueueFamilies();
+}
+
+void Device::findQueueFamilies() {
+    // We need to find the queue families that support graphics, compute, and transfer operations
+    uint32_t queueFamilyCount = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    for (uint32_t i = 0; i < queueFamilyCount; ++i) {
+        const auto &queueFamily = queueFamilies[i];
+        CoreQueue queue;
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            queue.capabilities.push_back(DeviceCapabilities::Graphics);
+        }
+        if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            queue.capabilities.push_back(DeviceCapabilities::Compute);
+        }
+        if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+            queue.capabilities.push_back(DeviceCapabilities::Transfer);
+        }
+
+        VkBool32 present = false;
+        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, instance.surface, &present);
+        if (present) {
+            queue.capabilities.push_back(DeviceCapabilities::Present);
+        }
+    }
+
+    if (queueFamilies.empty()) {
+        throw std::runtime_error("No suitable queue families found for the physical device");
+    }
+
+    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue &q) {
+        return std::find(q.capabilities.begin(), q.capabilities.end(), DeviceCapabilities::Graphics) !=
+               q.capabilities.end();
+    })) {
+        throw std::runtime_error("No graphics queue found for the physical device");
+    }
+
+    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue &q) {
+        return std::find(q.capabilities.begin(), q.capabilities.end(), DeviceCapabilities::Present) !=
+               q.capabilities.end();
+    })) {
+        throw std::runtime_error("No present queue found for the physical device");
+    }
+}
+
+void Device::initializeLogicalDevice() {
+    std::set<uint32_t> uniqueQueueFamilies;
+    for (const auto &queue: queues) {
+        for (const auto &capability: queue.capabilities) {
+            if (capability == DeviceCapabilities::Graphics ||
+                capability == DeviceCapabilities::Compute ||
+                capability == DeviceCapabilities::Transfer ||
+                capability == DeviceCapabilities::Present) {
+                uniqueQueueFamilies.insert(queue.familyIndex);
+            }
+        }
+    }
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    float queuePriority = 1.0f; // We set the queue priority to 1.0f
+
+    for (uint32_t familyIndex: uniqueQueueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = familyIndex;
+        queueCreateInfo.queueCount = 1; // We create one queue per family
+        queueCreateInfo.pQueuePriorities = &queuePriority; // We set the queue priority
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
+
+    physicalDeviceFeatures.samplerAnisotropy = VK_TRUE; // Enable anisotropic filtering
+
+    VkDeviceCreateInfo deviceCreateInfo{};
+    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+    deviceCreateInfo.pEnabledFeatures = &physicalDeviceFeatures; // We set the physical device features
+    deviceCreateInfo.enabledExtensionCount = extensions.count();
+    deviceCreateInfo.ppEnabledExtensionNames = extensions.data();
+
 }
 
 bool Device::supportsExtensions(const std::vector<std::string> &requiredExtensions) const {
