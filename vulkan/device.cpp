@@ -211,6 +211,16 @@ void Device::initializeLogicalDevice() {
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device. Error: " + zen::getVulkanErrorString(result));
     }
+
+    for (auto& queue : queues) {
+        if (queue.capabilities.empty()) {
+            continue; // Skip queues without capabilities
+        }
+
+        VkQueue vkQueue;
+        vkGetDeviceQueue(logicalDevice, queue.familyIndex, 0, &vkQueue); // We get the first queue of the family
+        queue.queue = vkQueue; // Set the Vulkan queue handle
+    }
 }
 
 std::vector<CoreQueue> Device::getQueueFromCapability(zen::DeviceCapabilities capability) {
@@ -400,5 +410,26 @@ std::shared_ptr<CommandBuffer> Device::requestCommandBuffer(RenderPipeline pipel
     return commandBuffers.back();
 }
 
+CoreQueue Device::getGraphicsQueue() const {
+    // We return the first queue that supports graphics operations
+    for (const auto& queue : queues) {
+        if (std::ranges::find(queue.capabilities, DeviceCapabilities::Graphics) !=
+            queue.capabilities.end()) {
+            return queue;
+        }
+    }
+    throw std::runtime_error("No graphics queue found for the device");
+}
+
+CoreQueue Device::getPresentQueue() const {
+    // We return the first queue that supports present operations
+    for (const auto& queue : queues) {
+        if (std::ranges::find(queue.capabilities, DeviceCapabilities::Present) !=
+            queue.capabilities.end()) {
+            return queue;
+        }
+    }
+    throw std::runtime_error("No present queue found for the device");
+}
 
 #endif

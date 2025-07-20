@@ -105,7 +105,7 @@ namespace zen {
         void begin() const;
         void end();
 
-        void beginRendering() const;
+        void beginRendering();
         void endRendering() const;
 
         void present() const;
@@ -119,7 +119,9 @@ namespace zen {
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkPipeline pipeline = VK_NULL_HANDLE;
         VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+        VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
         Presentable& presentable;
+        int imageIndex = 0;
         Device& device;
     };
 
@@ -181,6 +183,9 @@ namespace zen {
             RenderPipeline pipeline, Presentable& presentable);
 
         void makeCommandPool();
+
+        [[nodiscard]] CoreQueue getGraphicsQueue() const;
+        [[nodiscard]] CoreQueue getPresentQueue() const;
 
         Instance instance;
 

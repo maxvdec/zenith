@@ -50,12 +50,13 @@ namespace zen::glfw {
 
     class VkInitializer {
     public:
-        std::optional<GLFWwindow *> window = std::nullopt;
+        std::optional<GLFWwindow*> window = std::nullopt;
         VkInstance instance = VK_NULL_HANDLE;
         VkSurfaceKHR surface = VK_NULL_HANDLE;
-        const VkInitializerConfiguration &config;
+        VkInitializerConfiguration& config;
 
-        explicit VkInitializer(const VkInitializerConfiguration &config) : config(config) {}
+        explicit VkInitializer(VkInitializerConfiguration& config) : config(config) {
+        }
 
         void initialize();
 
@@ -69,10 +70,10 @@ namespace zen::glfw {
         void initializeDebugMessenger() const;
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-                VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-                VkDebugUtilsMessageTypeFlagsEXT type,
-                const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
-                void *userData);
+            VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+            VkDebugUtilsMessageTypeFlagsEXT type,
+            const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+            void* userData);
     };
 }
 
@@ -84,12 +85,15 @@ namespace zen::glfw {
 #ifdef ZENITH_VULKAN
         VkInitializer vulkan;
 
-        explicit Window(const VkInitializerConfiguration &config) : vulkan(config) {
-            vulkan.initialize();
+        explicit Window(VkInitializerConfiguration& config) : vulkan(config) {
         }
 
         inline void init() {
             vulkan.initialize();
+        }
+
+        inline void allEvents() {
+            glfwPollEvents();
         }
 
         [[nodiscard]] inline bool shouldClose() const {
@@ -97,8 +101,10 @@ namespace zen::glfw {
         }
 
         [[nodiscard]] inline Instance acquireInstance() const {
-            return {vulkan.instance, vulkan.surface,
-                    {static_cast<uint32_t>(vulkan.config.width), static_cast<uint32_t>(vulkan.config.height)}};
+            return {
+                vulkan.instance, vulkan.surface,
+                {static_cast<uint32_t>(vulkan.config.width), static_cast<uint32_t>(vulkan.config.height)}
+            };
         }
 
 #endif

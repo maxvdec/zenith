@@ -89,11 +89,15 @@ void main() {
     pipeline.makePipeline();
 
     while (!window.shouldClose()) {
-        auto commandBuffer = device->requestCommandBuffer(pipeline);
+        auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
         commandBuffer->beginRendering();
         commandBuffer->endRendering();
         commandBuffer->end();
+        commandBuffer->submit();
+        commandBuffer->present();
+
+        window.allEvents();
     }
     return 0;
 }

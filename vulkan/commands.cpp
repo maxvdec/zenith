@@ -30,7 +30,7 @@ void CommandBuffer::end() {
 }
 
 CommandBuffer::CommandBuffer(const RenderPipeline& pipeline, VkCommandPool commandPool, VkCommandBuffer commandBuffer,
-                             Device& device, Presentable& presentable): device(device), presentable(presentable) {
+                             Device& device, Presentable& presentable) : presentable(presentable), device(device) {
     this->commandPool = commandPool;
     this->commandBuffer = commandBuffer;
     this->inUse = true;
@@ -38,12 +38,12 @@ CommandBuffer::CommandBuffer(const RenderPipeline& pipeline, VkCommandPool comma
     this->renderPass = pipeline.renderPass.renderPass;
 }
 
-void CommandBuffer::beginRendering() const {
-    uint32_t imageIndex = 0;
+void CommandBuffer::beginRendering() {
+    uint32_t imageIndexLocal = 0;
     vkAcquireNextImageKHR(device.logicalDevice, presentable.swapchain, UINT64_MAX,
-                          imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+                          imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndexLocal);
+    imageIndex = static_cast<int>(imageIndexLocal);
 
-    vkResetCommandBuffer(commandBuffer, 0);
     VkRenderPassBeginInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
@@ -65,6 +65,20 @@ void CommandBuffer::endRendering() const {
 }
 
 void CommandBuffer::present() const {
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    VkSemaphore waitSemaphores[] = {renderFinishedSemaphore};
+    presentInfo.pWaitSemaphores = waitSemaphores;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &presentable.swapchain;
+    auto imageIndexLocal = static_cast<uint32_t>(imageIndex);
+    presentInfo.pImageIndices = &imageIndexLocal;
+    presentInfo.pResults = nullptr;
+
+    VkQueue queue = device.getPresentQueue().queue;
+
+    vkQueuePresentKHR(queue, &presentInfo);
 }
 
 void CommandBuffer::submit() const {
@@ -76,8 +90,19 @@ void CommandBuffer::submit() const {
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
     submitInfo.pWaitDstStageMask = waitStages;
 
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+
     submitInfo.signalSemaphoreCount = 1;
-    VkSemaphore signalSemaphore = VK_NULL_HANDLE; // This should be set to a valid semaphore if needed
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    submitInfo.pWaitSemaphores = waitSemaphores;
+
+    VkQueue graphicsQueue = device.getGraphicsQueue().queue;
+
+    vkQueueSubmit(graphicsQueue, 1,
+                  &submitInfo, VK_NULL_HANDLE
+    );
 }
 
 

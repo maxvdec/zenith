@@ -50,7 +50,7 @@ void VkInitializer::initialize() {
     glfwWindowHint(GLFW_RESIZABLE, config.resizable ? GLFW_TRUE : GLFW_FALSE);
 
     int monitorCount = 0;
-    GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     if (monitorCount == 0) {
         glfwTerminate();
         throw std::runtime_error("No monitors found");
@@ -59,7 +59,7 @@ void VkInitializer::initialize() {
         glfwTerminate();
         throw std::runtime_error("Invalid monitor index: " + std::to_string(config.monitorIndex));
     }
-    GLFWmonitor *monitor = monitors[config.monitorIndex];
+    GLFWmonitor* monitor = monitors[config.monitorIndex];
     if (config.monitorIndex == 0) {
         monitor = glfwGetPrimaryMonitor();
     }
@@ -71,9 +71,9 @@ void VkInitializer::initialize() {
         monitor = nullptr; // Set to nullptr for windowed mode
     }
 
-    window = std::make_optional<GLFWwindow *>(glfwCreateWindow(config.width, config.height, config.name.c_str(),
-                                                               monitor,
-                                                               nullptr));
+    window = std::make_optional<GLFWwindow*>(glfwCreateWindow(config.width, config.height, config.name.c_str(),
+                                                              monitor,
+                                                              nullptr));
 
     // Then, we check if the window was created successfully
     if (!*window) {
@@ -81,18 +81,32 @@ void VkInitializer::initialize() {
         throw std::runtime_error("Failed to create GLFW window");
     }
 
+    // We also need to change some stuff for Apple Retina displays
+#ifdef __APPLE__
+    int width, height;
+    glfwGetFramebufferSize(*window, &width, &height);
+    if (width <= 0 || height <= 0) {
+        glfwDestroyWindow(*window);
+        glfwTerminate();
+        throw std::runtime_error("Invalid framebuffer size for Retina display");
+    }
+    config.width = width;
+    config.height = height;
+
+#endif
+
     initializeVulkan(); // We pass the window to the Vulkan initialization function
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VkInitializer::debugCallback(
-        VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-        VkDebugUtilsMessageTypeFlagsEXT type,
-        const VkDebugUtilsMessengerCallbackDataEXT *callbackData,
-        void *userData) {
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT type,
+    const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+    void* userData) {
     // Unused parameters to avoid warnings
-    (void) severity;
-    (void) type;
-    (void) userData;
+    (void)severity;
+    (void)type;
+    (void)userData;
     std::cout << "[VULKAN DEBUG] " << callbackData->pMessage << std::endl;
     return VK_FALSE;
 }
@@ -102,23 +116,23 @@ void VkInitializer::initializeDebugMessenger() const {
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     debugCreateInfo.messageSeverity =
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     debugCreateInfo.messageType =
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     debugCreateInfo.pfnUserCallback = VkInitializer::debugCallback;
 
     auto createUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-            vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+        vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
     if (createUtilsMessengerEXT == nullptr) {
         throw std::runtime_error("Failed to load vkCreateDebugUtilsMessengerEXT function");
     }
     if (createUtilsMessengerEXT(instance, &debugCreateInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create debug messenger. Error: " +
-                                 zen::getVulkanErrorString(VK_ERROR_INITIALIZATION_FAILED));
+            zen::getVulkanErrorString(VK_ERROR_INITIALIZATION_FAILED));
     }
 }
 
@@ -137,7 +151,7 @@ void VkInitializer::initializeVulkan() {
 
     // Then, we get the required extensions GLFW needs to create a Vulkan instance
     uint32_t extensionCount = 0;
-    const char **extensions = glfwGetRequiredInstanceExtensions(&extensionCount);
+    const char** extensions = glfwGetRequiredInstanceExtensions(&extensionCount);
 
     // Then, we create the Vulkan application info
     VkApplicationInfo appInfo{};
@@ -153,13 +167,13 @@ void VkInitializer::initializeVulkan() {
     appInfo.apiVersion = config.vulkanVersion;
 
     // We must load the extensions now.
-    std::vector<const char *> enabledExtensions(extensions, extensions + extensionCount);
+    std::vector<const char*> enabledExtensions(extensions, extensions + extensionCount);
     if (!config.extraExtensions.empty()) {
-        for (const auto &ext: config.extraExtensions) {
+        for (const auto& ext : config.extraExtensions) {
             CoreVulkanExtension extension(ext);
             if (!extension.exists()) {
                 std::cerr << "Warning: Vulkan extension " << ext
-                          << " does not exist. Skipping." << std::endl;
+                    << " does not exist. Skipping." << std::endl;
                 continue;
             }
             enabledExtensions.push_back(ext.c_str());
@@ -170,7 +184,7 @@ void VkInitializer::initializeVulkan() {
         // If the debug messenger is enabled, we add the debug utils extension
         if (!zen::CoreVulkanExtension{"VK_EXT_debug_utils"}.exists()) {
             std::cerr << "Warning: VK_EXT_debug_utils extension not found. Debug messenger will not be enabled."
-                      << std::endl;
+                << std::endl;
         }
         enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
@@ -187,7 +201,7 @@ void VkInitializer::initializeVulkan() {
     vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionCount, availableExtensions.data());
 
     bool portabilityEnumerationFound = false;
-    for (const auto &ext: availableExtensions) {
+    for (const auto& ext : availableExtensions) {
         if (strcmp(ext.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0) {
             portabilityEnumerationFound = true;
             break;
@@ -196,7 +210,7 @@ void VkInitializer::initializeVulkan() {
 
     if (!portabilityEnumerationFound) {
         std::cerr << "Warning: VK_KHR_portability_enumeration extension not found. This may cause issues on macOS."
-                  << std::endl;
+            << std::endl;
     }
 #endif
 
@@ -217,7 +231,8 @@ void VkInitializer::initializeVulkan() {
         if (validationLayer.exists()) {
             // If the validation layer exists, we enable it
             validationLayer.enable(&createInfo);
-        } else {
+        }
+        else {
             std::cerr << "Validation layer " << validationLayer.name << " does not exist. Skipping." << std::endl;
         }
     }
