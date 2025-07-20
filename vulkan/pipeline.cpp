@@ -119,4 +119,24 @@ void RenderPass::create(const Device& device) {
         throw std::runtime_error("Failed to create render pass. Error: " + zen::getVulkanErrorString(result));
     }
 }
+
+template <int N>
+void InputDescriptor<N>::buildInputLayout() {
+    int size = 0;
+    for (const auto& item : items) {
+        size += static_cast<int>(item->getSize());
+    }
+    binding.binding = 0;
+    binding.stride = size;
+    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // We use vertex input rate for now
+
+    for (size_t i = 0; i < items.size(); ++i) {
+        const auto& item = items[i];
+        attributes[i].location = item->getLocation();
+        attributes[i].binding = binding.binding;
+        attributes[i].format = zen::toVulkanFormat(item->getFormat());
+        attributes[i].offset = static_cast<uint32_t>(i * item->getSize());
+    }
+}
+
 #endif

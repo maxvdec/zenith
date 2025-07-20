@@ -28,5 +28,32 @@ bool Format::isSupportedDepthAttachment(const zen::Device& device) const {
     return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0;
 }
 
+VkFormat zen::toVulkanFormat(InputFormat format) {
+    switch (format) {
+    case InputFormat::Vector3:
+        return VK_FORMAT_R32G32B32_SFLOAT;
+    case InputFormat::Vector2:
+        return VK_FORMAT_R32G32_SFLOAT;
+    case InputFormat::Vector4:
+        return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case InputFormat::Color:
+        return VK_FORMAT_B8G8R8A8_SRGB; // Common color format
+    case InputFormat::Float:
+        return VK_FORMAT_R32_SFLOAT;
+    case InputFormat::Int:
+        return VK_FORMAT_R32_SINT;
+    case InputFormat::Uint:
+        return VK_FORMAT_R32_UINT;
+    case InputFormat::Bool:
+        return VK_FORMAT_R8_UINT; // No direct boolean format, using unsigned byte
+    case InputFormat::Mat3:
+        return VK_FORMAT_R32G32B32_SFLOAT; // No direct mat3 format, using vec3
+    case InputFormat::Mat4:
+        return VK_FORMAT_R32G32B32A32_SFLOAT; // No direct mat4 format, using vec4
+    default:
+        throw std::runtime_error("Unsupported input format");
+    }
+}
+
 
 #endif

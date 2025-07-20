@@ -88,13 +88,20 @@ namespace zen {
 
     class RenderAttachment;
 
+    class ShaderModule;
+
+    enum class ShaderType;
+
+    template <int N>
+    class InputDescriptor;
+
     class Device {
     public:
         DevicePicker picker = DevicePicker::makeDefaultPicker();
 
         static std::unique_ptr<Device> makeDefaultDevice(Instance instance);
 
-        explicit Device(Instance instance, DevicePicker picker = DevicePicker::makeDefaultPicker())
+        explicit Device(const Instance& instance, DevicePicker picker = DevicePicker::makeDefaultPicker())
             : picker(std::move(picker)), instance(instance) {
         }
 
@@ -129,6 +136,13 @@ namespace zen {
         [[nodiscard]] Format makeColorFormat() const;
 
         [[nodiscard]] RenderPass makeRenderPass(std::vector<RenderAttachment>&) const;
+
+        [[nodiscard]] ShaderModule makeShader(const std::string& source, ShaderType type) const;
+
+        [[nodiscard]] ShaderModule makeShader(const std::vector<uint32_t>& code, ShaderType type) const;
+
+        template <int N>
+        void useInputDescriptor(InputDescriptor<N>& inputDescriptor) const;
 
     private:
         Instance instance;
@@ -221,23 +235,155 @@ namespace zen {
 
     EShLanguage toGlslShaderType(ShaderType type);
 
+
+    struct CoreShaderSpecializationValueInterface {
+        virtual ~CoreShaderSpecializationValueInterface() = default;
+        [[nodiscard]] virtual size_t getSize() const = 0;
+        [[nodiscard]] virtual int getId() const = 0;
+        [[nodiscard]] virtual const void* getValue() const = 0;
+    };
+
+    template <typename T>
+    struct ShaderSpecializationValue final : public CoreShaderSpecializationValueInterface {
+        T value;
+        int id;
+
+        ShaderSpecializationValue(const int id, const T& v) : value(v), id(id) {
+        }
+
+        [[nodiscard]] size_t getSize() const override { return sizeof(T); }
+        [[nodiscard]] const void* getValue() const override { return &value; }
+        [[nodiscard]] int getId() const override { return id; }
+    };
+
+    class ShaderSpecializationInformation {
+    public:
+        ShaderSpecializationInformation() = default;
+
+        ShaderSpecializationInformation(const ShaderSpecializationInformation&) = delete;
+        ShaderSpecializationInformation& operator=(const ShaderSpecializationInformation&) = delete;
+
+        ShaderSpecializationInformation(ShaderSpecializationInformation&&) noexcept = default;
+        ShaderSpecializationInformation& operator=(ShaderSpecializationInformation&&) noexcept = default;
+
+        template <typename T>
+        void addValue(int id, const T& value) {
+            values.push_back(std::make_unique<ShaderSpecializationValue<T>>(id, value));
+        }
+
+        VkSpecializationInfo specializationInfo = {};
+        void createSpecializationInfo();
+
+    private:
+        std::vector<std::unique_ptr<CoreShaderSpecializationValueInterface>> values{};
+        std::vector<VkSpecializationMapEntry> specializations{};
+        std::vector<uint8_t> specializationData{};
+    };
+
     class ShaderModule {
     public:
         VkShaderModule shaderModule = VK_NULL_HANDLE;
         ShaderType type = ShaderType::Vertex;
+        std::string entryPoint;
+        ShaderSpecializationInformation specializationInfo;
 
         static ShaderModule loadFromSource(const std::string& source, const Device& device, ShaderType type);
         static ShaderModule loadFromCompiled(const std::vector<uint32_t>& code, const Device& device, ShaderType type);
+
+        void compile(std::string entryPoint, ShaderSpecializationInformation info = {});
     };
 
     class ShaderProgram {
     public:
-        std::vector<VkShaderModule> shaderModules = {};
+        std::vector<ShaderModule> shaderModules = {};
+
+        ShaderProgram() = default;
+
+        explicit ShaderProgram(std::vector<ShaderModule> shaderModules) : shaderModules(std::move(shaderModules)) {
+        }
     };
 
-    class RenderingPipeline {
+    enum class InputFormat {
+        Vector3,
+        Vector2,
+        Vector4,
+        Color,
+        Float,
+        Int,
+        Uint,
+        Bool,
+        Mat3,
+        Mat4,
+    };
+
+    VkFormat toVulkanFormat(InputFormat format);
+
+    struct InputDescriptorItemInterface {
+        virtual ~InputDescriptorItemInterface() = default;
+        [[nodiscard]] virtual int getLocation() const = 0;
+        [[nodiscard]] virtual InputFormat getFormat() const = 0;
+        [[nodiscard]] virtual size_t getSize() const = 0;
+    };
+
+    template <typename T>
+    struct InputDescriptorItem final : public InputDescriptorItemInterface {
+        int location = 0;
+        InputFormat format = InputFormat::Vector3;
+
+        InputDescriptorItem(const int location, const InputFormat format) : location(location), format(format) {
+        }
+
+        InputDescriptorItem() = default;
+
+        [[nodiscard]] int getLocation() const override { return location; }
+        [[nodiscard]] InputFormat getFormat() const override { return format; }
+        [[nodiscard]] size_t getSize() const override { return sizeof(T); }
+    };
+
+
+    template <int N>
+    class InputDescriptor {
+    public:
+        std::array<VkVertexInputAttributeDescription, N> attributes = {};
+        VkVertexInputBindingDescription binding = {};
+        std::vector<std::unique_ptr<InputDescriptorItemInterface>> items;
+
+        InputDescriptor() = default;
+
+        InputDescriptor(InputDescriptor&&) noexcept = default;
+
+        InputDescriptor& operator=(InputDescriptor&&) noexcept = default;
+
+        InputDescriptor(const InputDescriptor&) = delete;
+
+        InputDescriptor& operator=(const InputDescriptor&) = delete;
+
+        void buildInputLayout();
+
+        template <typename T>
+        inline void addItem(const InputDescriptorItem<T>& item) {
+            if (items.size() < N) {
+                items.push_back(std::make_unique<InputDescriptorItem<T>>(item));
+            }
+            else {
+                throw std::runtime_error("InputDescriptor: Too many items added");
+            }
+        }
+
+        [[nodiscard]] inline size_t getSize() const {
+            size_t size = 0;
+            for (const auto& item : items) {
+                size += item->getSize();
+            }
+            return size;
+        }
+    };
+
+
+    class RenderPipeline {
     public:
         VkPipeline pipeline = VK_NULL_HANDLE;
+        ShaderProgram shaderProgram = ShaderProgram();
     };
 };
 

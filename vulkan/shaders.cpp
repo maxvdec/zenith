@@ -16,7 +16,7 @@
 
 using namespace zen;
 
-EShLanguage toGlslShaderType(const ShaderType type) {
+EShLanguage zen::toGlslShaderType(const ShaderType type) {
     switch (type) {
     case ShaderType::Vertex:
         return EShLangVertex;
@@ -172,6 +172,47 @@ ShaderModule ShaderModule::loadFromCompiled(const std::vector<uint32_t>& code, c
         throw std::runtime_error("Failed to create shader module. Error: " + zen::getVulkanErrorString(result));
     }
     return module;
+}
+
+void ShaderSpecializationInformation::createSpecializationInfo() {
+    specializations.clear();
+    specializationData.clear();
+
+    size_t offset = 0;
+    for (const auto& val : values) {
+        VkSpecializationMapEntry entry{};
+        entry.constantID = val->getId();
+        entry.offset = static_cast<uint32_t>(offset);
+        entry.size = val->getSize();
+        specializations.push_back(entry);
+
+        const auto* ptr = static_cast<const uint8_t*>(val->getValue());
+        specializationData.insert(specializationData.end(), ptr, ptr + val->getSize());
+
+        offset += val->getSize();
+    }
+
+    specializationInfo.mapEntryCount = static_cast<uint32_t>(specializations.size());
+    specializationInfo.pMapEntries = specializations.data();
+    specializationInfo.dataSize = specializationData.size();
+    specializationInfo.pData = specializationData.data();
+}
+
+void ShaderModule::compile(std::string entryPoint, ShaderSpecializationInformation info) {
+    VkPipelineShaderStageCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    createInfo.stage = static_cast<VkShaderStageFlagBits>(type);
+    createInfo.module = shaderModule;
+    createInfo.pName = entryPoint.c_str();
+    if (!info.specializationInfo.pData || info.specializationInfo.dataSize == 0) {
+        createInfo.pSpecializationInfo = nullptr; // No specialization info
+    }
+    else {
+        info.createSpecializationInfo();
+        createInfo.pSpecializationInfo = &info.specializationInfo;
+    }
+    entryPoint = createInfo.pName; // Store the entry point for later use
+    specializationInfo = std::move(info); // Store the specialization info
 }
 
 

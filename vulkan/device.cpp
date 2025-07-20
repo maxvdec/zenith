@@ -336,4 +336,20 @@ RenderPass Device::makeRenderPass(std::vector<RenderAttachment>& attachments) co
     return renderPass;
 }
 
+ShaderModule Device::makeShader(const std::string& source, ShaderType type) const {
+    // We create a shader module from the source code
+    return ShaderModule::loadFromSource(source, *this, type);
+}
+
+ShaderModule Device::makeShader(const std::vector<uint32_t>& code, ShaderType type) const {
+    // We create a shader module from the compiled code
+    return ShaderModule::loadFromCompiled(code, *this, type);
+}
+
+template <int N>
+void Device::useInputDescriptor(InputDescriptor<N>& inputDescriptor) const {
+    inputDescriptor.buildInputLayout(); // We build the input layout for the descriptor
+}
+
+
 #endif
