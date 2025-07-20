@@ -299,5 +299,9 @@ bool Device::supportsRaytracing() const {
     return rayTracingFeatures.rayTracingPipeline;
 }
 
+Presentable Device::makePresentable() const {
+    // We create a presentable object that can be used to present images to the swapchain
+    return Presentable(*this, instance);
+}
 
 #endif

@@ -21,6 +21,7 @@ int main() {
     window.init();
 
     auto device = zen::Device::makeDefaultDevice(window.acquireInstance());
+    auto presentable = device->makePresentable();
 
     while (!window.shouldClose()) {
 

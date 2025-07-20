@@ -97,7 +97,8 @@ namespace zen::glfw {
         }
 
         [[nodiscard]] inline Instance acquireInstance() const {
-            return {vulkan.instance, vulkan.surface};
+            return {vulkan.instance, vulkan.surface,
+                    {static_cast<uint32_t>(vulkan.config.width), static_cast<uint32_t>(vulkan.config.height)}};
         }
 
 #endif

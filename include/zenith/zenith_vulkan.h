@@ -19,8 +19,10 @@ namespace zen {
     struct Instance {
         VkInstance instance;
         VkSurfaceKHR surface;
+        VkExtent2D extent = {0, 0};
 
-        Instance(VkInstance instance, VkSurfaceKHR surface) : instance(instance), surface(surface) {};
+        Instance(VkInstance instance, VkSurfaceKHR surface, VkExtent2D extent) : instance(instance), surface(surface),
+                                                                                 extent(extent) {};
     };
 
     class CoreValidationLayer {
@@ -74,6 +76,8 @@ namespace zen {
         std::vector<DeviceCapabilities> capabilities = {};
     };
 
+    class Presentable;
+
     class Device {
     public:
         DevicePicker picker = DevicePicker::makeDefaultPicker();
@@ -107,6 +111,8 @@ namespace zen {
 
         std::vector<CoreQueue> getQueueFromCapability(DeviceCapabilities capability);
 
+        [[nodiscard]] Presentable makePresentable() const;
+
     private:
         Instance instance;
 
@@ -127,7 +133,21 @@ namespace zen {
         VkFormat format = VK_FORMAT_UNDEFINED;
         VkExtent2D extent = {0, 0};
 
-        Presentable(Device device)
+        Presentable(Device device, Instance instance);
+
+        ~Presentable();
+
+    private:
+        Device device;
+        Instance instance;
+
+        void create();
+
+        static VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+
+        static VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
+
+        static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, VkExtent2D windowExtent);
     };
 };
 
