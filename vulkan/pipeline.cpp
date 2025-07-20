@@ -71,7 +71,7 @@ VkAttachmentLoadOp zen::toVulkanLoadOp(zen::Operation operation) {
     }
 }
 
-void RenderPass::create(const Device& device) {
+void RenderPass::create(Device& device, const Presentable& presentable) {
     if (attachments.empty()) {
         throw std::runtime_error("No attachments specified to create the Render Pass");
     }
@@ -117,6 +117,28 @@ void RenderPass::create(const Device& device) {
         !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to create render pass. Error: " + zen::getVulkanErrorString(result));
+    }
+
+    device.framebuffers.resize(presentable.images.size());
+    for (size_t i = 0; i < presentable.images.size(); i++) {
+        std::vector<VkImageView> attachmentViews;
+        attachmentViews.push_back(presentable.images[i].view);
+        if (attachments.size() > 1 && attachments[1].layout == AttachmentLayout::DepthAttachment) {
+        }
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = static_cast<uint32_t>(attachmentViews.size());
+        framebufferInfo.pAttachments = attachmentViews.data();
+        framebufferInfo.width = presentable.extent.width;
+        framebufferInfo.height = presentable.extent.height;
+        framebufferInfo.layers = 1;
+
+        if (vkCreateFramebuffer(device.logicalDevice, &framebufferInfo, nullptr, &device.framebuffers[i].framebuffer) !=
+            VK_SUCCESS) {
+            throw std::runtime_error("Failed to create framebuffer!");
+        }
     }
 }
 

@@ -35,7 +35,7 @@ int main() {
 
     attachments.emplace_back(colorAttachment);
 
-    zen::RenderPass renderPass = device->makeRenderPass(attachments);
+    zen::RenderPass renderPass = device->makeRenderPass(attachments, presentable);
 
     zen::ShaderModule vertexShader = device->makeShader(R"(
 #version 450
@@ -89,8 +89,10 @@ void main() {
     pipeline.makePipeline();
 
     while (!window.shouldClose()) {
-        auto commandBuffer = device->requestCommandBuffer();
+        auto commandBuffer = device->requestCommandBuffer(pipeline);
         commandBuffer->begin();
+        commandBuffer->beginRendering();
+        commandBuffer->endRendering();
         commandBuffer->end();
     }
     return 0;

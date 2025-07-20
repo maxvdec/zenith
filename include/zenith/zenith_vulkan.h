@@ -98,18 +98,33 @@ namespace zen {
 
     class CommandBuffer {
     public:
-        CommandBuffer(VkCommandPool commandPool = VK_NULL_HANDLE, VkCommandBuffer commandBuffer = VK_NULL_HANDLE)
-            : commandPool(commandPool), commandBuffer(commandBuffer) {
-        }
+        CommandBuffer(const RenderPipeline& pipeline, VkCommandPool commandPool,
+                      VkCommandBuffer commandBuffer, Device& device, Presentable& presentable
+        );
 
         void begin() const;
         void end();
+
+        void beginRendering() const;
+        void endRendering() const;
+
+        void present() const;
+        void submit() const;
 
         bool inUse;
 
     private:
         [[maybe_unused]] VkCommandPool commandPool = VK_NULL_HANDLE;
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        VkRenderPass renderPass = VK_NULL_HANDLE;
+        VkPipeline pipeline = VK_NULL_HANDLE;
+        VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+        Presentable& presentable;
+        Device& device;
+    };
+
+    struct Framebuffer {
+        VkFramebuffer framebuffer = VK_NULL_HANDLE;
     };
 
     class Device {
@@ -152,7 +167,7 @@ namespace zen {
 
         [[nodiscard]] Format makeColorFormat() const;
 
-        [[nodiscard]] RenderPass makeRenderPass(std::vector<RenderAttachment>&) const;
+        [[nodiscard]] RenderPass makeRenderPass(std::vector<RenderAttachment>&, Presentable&);
 
         [[nodiscard]] ShaderModule makeShader(const std::string& source, ShaderType type) const;
 
@@ -162,11 +177,14 @@ namespace zen {
 
         void useInputDescriptor(InputDescriptor& inputDescriptor) const;
 
-        [[nodiscard]] std::shared_ptr<CommandBuffer> requestCommandBuffer();
+        [[nodiscard]] std::shared_ptr<CommandBuffer> requestCommandBuffer(
+            RenderPipeline pipeline, Presentable& presentable);
 
         void makeCommandPool();
 
         Instance instance;
+
+        std::vector<Framebuffer> framebuffers = {};
 
     private:
         void findQueueFamilies();
@@ -251,7 +269,7 @@ namespace zen {
             attachments.push_back(attachment);
         }
 
-        void create(const Device& device);
+        void create(Device& device, const Presentable& presentable);
     };
 
     enum class ShaderType {

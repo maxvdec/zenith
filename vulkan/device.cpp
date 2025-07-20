@@ -331,10 +331,10 @@ Format Device::makeColorFormat() const {
     return colorFormat;
 }
 
-RenderPass Device::makeRenderPass(std::vector<RenderAttachment>& attachments) const {
+RenderPass Device::makeRenderPass(std::vector<RenderAttachment>& attachments, Presentable& presentable) {
     RenderPass renderPass{};
     renderPass.attachments = std::move(attachments);
-    renderPass.create(*this); // We create the render pass with the current device
+    renderPass.create(*this, presentable); // We create the render pass with the current device
     return renderPass;
 }
 
@@ -373,7 +373,7 @@ void Device::makeCommandPool() {
     this->commandPool = commandPool;
 }
 
-std::shared_ptr<CommandBuffer> Device::requestCommandBuffer() {
+std::shared_ptr<CommandBuffer> Device::requestCommandBuffer(RenderPipeline pipeline, Presentable& presentable) {
     if (!commandPool.has_value()) {
         makeCommandPool();
     }
@@ -394,7 +394,7 @@ std::shared_ptr<CommandBuffer> Device::requestCommandBuffer() {
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffer. Error: " + zen::getVulkanErrorString(result));
     }
-    CommandBuffer buffer = {commandPool.value(), commandBuffer};
+    CommandBuffer buffer = {pipeline, commandPool.value(), commandBuffer, *this, presentable};
     buffer.inUse = true;
     commandBuffers.push_back(std::make_shared<CommandBuffer>(buffer));
     return commandBuffers.back();
