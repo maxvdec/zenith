@@ -19,7 +19,8 @@ using namespace zen;
 
 DevicePicker DevicePicker::makeDefaultPicker() {
     // We make a default device picker that sorts devices by their score
-    return DevicePicker([](const Device &device) -> float {
+    return DevicePicker([](const Device& device) -> float
+    {
         if (!device.supportsExtensions()) {
             return 0.0f;
         }
@@ -36,13 +37,15 @@ DevicePicker DevicePicker::makeDefaultPicker() {
 
         if (device.physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
             score += 1000.0f; // Discrete GPUs are preferred
-        } else if (device.physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+        }
+        else if (device.physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
             score += 500.0f; // Integrated GPUs are still good
-        } else {
+        }
+        else {
             score += 100.0f; // Other types of devices
         }
 
-        score += (float) device.physicalDeviceProperties.limits.maxImageDimension2D; // Higher resolution is better
+        score += (float)device.physicalDeviceProperties.limits.maxImageDimension2D; // Higher resolution is better
 
         if (device.physicalDeviceFeatures.samplerAnisotropy) {
             score += 200.0f; // Anisotropic filtering support is a plus
@@ -80,7 +83,7 @@ void Device::init() {
     vkEnumeratePhysicalDevices(instance.instance, &deviceCount, devices.data());
 
     std::optional<std::pair<VkPhysicalDevice, float>> bestDevice = std::nullopt;
-    for (const auto &device: devices) {
+    for (const auto& device : devices) {
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(device, &properties);
         VkPhysicalDeviceFeatures features{};
@@ -123,7 +126,7 @@ void Device::findQueueFamilies() {
     queues.clear(); // Make sure it's empty
 
     for (uint32_t i = 0; i < queueFamilyCount; ++i) {
-        const auto &queueFamily = queueFamilies[i];
+        const auto& queueFamily = queueFamilies[i];
         CoreQueue queue;
         queue.familyIndex = i; // Set the family index
 
@@ -150,16 +153,18 @@ void Device::findQueueFamilies() {
         throw std::runtime_error("No suitable queue families found for the physical device");
     }
 
-    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue &q) {
+    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue& q)
+    {
         return std::find(q.capabilities.begin(), q.capabilities.end(), DeviceCapabilities::Graphics) !=
-               q.capabilities.end();
+            q.capabilities.end();
     })) {
         throw std::runtime_error("No graphics queue found for the physical device");
     }
 
-    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue &q) {
+    if (std::none_of(queues.begin(), queues.end(), [](const CoreQueue& q)
+    {
         return std::find(q.capabilities.begin(), q.capabilities.end(), DeviceCapabilities::Present) !=
-               q.capabilities.end();
+            q.capabilities.end();
     })) {
         throw std::runtime_error("No present queue found for the physical device");
     }
@@ -167,8 +172,8 @@ void Device::findQueueFamilies() {
 
 void Device::initializeLogicalDevice() {
     std::set<uint32_t> uniqueQueueFamilies;
-    for (const auto &queue: queues) {
-        for (const auto &capability: queue.capabilities) {
+    for (const auto& queue : queues) {
+        for (const auto& capability : queue.capabilities) {
             if (capability == DeviceCapabilities::Graphics ||
                 capability == DeviceCapabilities::Compute ||
                 capability == DeviceCapabilities::Transfer ||
@@ -181,7 +186,7 @@ void Device::initializeLogicalDevice() {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     float queuePriority = 1.0f; // We set the queue priority to 1.0f
 
-    for (uint32_t familyIndex: uniqueQueueFamilies) {
+    for (uint32_t familyIndex : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = familyIndex;
@@ -208,7 +213,7 @@ void Device::initializeLogicalDevice() {
 
 std::vector<CoreQueue> Device::getQueueFromCapability(zen::DeviceCapabilities capability) {
     std::vector<CoreQueue> result;
-    for (const auto &queue: queues) {
+    for (const auto& queue : queues) {
         if (std::find(queue.capabilities.begin(), queue.capabilities.end(), capability) != queue.capabilities.end()) {
             result.push_back(queue);
         }
@@ -217,10 +222,10 @@ std::vector<CoreQueue> Device::getQueueFromCapability(zen::DeviceCapabilities ca
 }
 
 
-bool Device::supportsExtensions(const std::vector<std::string> &requiredExtensions) const {
+bool Device::supportsExtensions(const std::vector<std::string>& requiredExtensions) const {
     std::vector<std::string> extensionsToCheck = requiredExtensions;
     if (extensionsToCheck.empty()) {
-        for (const char *ext: extensions) {
+        for (const char* ext : extensions) {
             extensionsToCheck.push_back(std::string(ext));
         }
     }
@@ -231,11 +236,11 @@ bool Device::supportsExtensions(const std::vector<std::string> &requiredExtensio
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
     std::set<std::string> available;
-    for (const auto &ext: availableExtensions) {
+    for (const auto& ext : availableExtensions) {
         available.insert(ext.extensionName);
     }
 
-    for (const auto &req: extensionsToCheck) {
+    for (const auto& req : extensionsToCheck) {
         if (available.find(req) == available.end()) {
             return false;
         }
@@ -301,7 +306,34 @@ bool Device::supportsRaytracing() const {
 
 Presentable Device::makePresentable() const {
     // We create a presentable object that can be used to present images to the swapchain
-    return Presentable(*this, instance);
+    return {*this, instance};
+}
+
+Format Device::makeDepthFormat() const {
+    // We create a depth format that can be used for depth testing
+    Format depthFormat;
+    depthFormat.format = VK_FORMAT_D32_SFLOAT;
+    if (!depthFormat.isSupportedDepthAttachment(*this)) {
+        throw std::runtime_error("Depth format VK_FORMAT_D32_SFLOAT is not supported by the device");
+    }
+    return depthFormat;
+}
+
+Format Device::makeColorFormat() const {
+    // We create a color format that can be used for color attachments
+    Format colorFormat;
+    colorFormat.format = VK_FORMAT_B8G8R8A8_SRGB; // This is a common format for color attachments
+    if (!colorFormat.isSupportedColorAttachment(*this)) {
+        throw std::runtime_error("Color format VK_FORMAT_B8G8R8A8_SRGB is not supported by the device");
+    }
+    return colorFormat;
+}
+
+RenderPass Device::makeRenderPass(std::vector<RenderAttachment>& attachments) const {
+    RenderPass renderPass{};
+    renderPass.attachments = std::move(attachments);
+    renderPass.create(*this); // We create the render pass with the current device
+    return renderPass;
 }
 
 #endif

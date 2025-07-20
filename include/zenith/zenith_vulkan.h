@@ -22,7 +22,8 @@ namespace zen {
         VkExtent2D extent = {0, 0};
 
         Instance(VkInstance instance, VkSurfaceKHR surface, VkExtent2D extent) : instance(instance), surface(surface),
-                                                                                 extent(extent) {};
+            extent(extent) {
+        };
     };
 
     class CoreValidationLayer {
@@ -31,7 +32,7 @@ namespace zen {
 
         [[nodiscard]] bool exists() const;
 
-        void enable(VkInstanceCreateInfo *createInfo) const;
+        void enable(VkInstanceCreateInfo* createInfo) const;
 
         static std::vector<CoreValidationLayer> getDeviceLayers();
     };
@@ -51,7 +52,7 @@ namespace zen {
 
     class Device;
 
-    using DeviceSelector = std::function<float(const Device &)>;
+    using DeviceSelector = std::function<float(const Device&)>;
 
     class DevicePicker {
     public:
@@ -59,7 +60,8 @@ namespace zen {
 
         static DevicePicker makeDefaultPicker();
 
-        explicit DevicePicker(DeviceSelector selector) : selector(std::move(selector)) {};
+        explicit DevicePicker(DeviceSelector selector) : selector(std::move(selector)) {
+        };
     };
 
     enum class DeviceCapabilities {
@@ -78,6 +80,12 @@ namespace zen {
 
     class Presentable;
 
+    struct Format;
+
+    class RenderPass;
+
+    class RenderAttachment;
+
     class Device {
     public:
         DevicePicker picker = DevicePicker::makeDefaultPicker();
@@ -85,9 +93,10 @@ namespace zen {
         static std::unique_ptr<Device> makeDefaultDevice(Instance instance);
 
         explicit Device(Instance instance, DevicePicker picker = DevicePicker::makeDefaultPicker())
-                : picker(std::move(picker)), instance(instance) {}
+            : picker(std::move(picker)), instance(instance) {
+        }
 
-        [[nodiscard]] bool supportsExtensions(const std::vector<std::string> &requiredExtensions = {}) const;
+        [[nodiscard]] bool supportsExtensions(const std::vector<std::string>& requiredExtensions = {}) const;
 
         [[nodiscard]] bool supportsSwapchain() const;
 
@@ -105,13 +114,19 @@ namespace zen {
         VkDevice logicalDevice = VK_NULL_HANDLE;
         std::vector<CoreQueue> queues;
 
-        std::vector<const char *> extensions = {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        std::vector<const char*> extensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
 
         std::vector<CoreQueue> getQueueFromCapability(DeviceCapabilities capability);
 
         [[nodiscard]] Presentable makePresentable() const;
+
+        [[nodiscard]] Format makeDepthFormat() const;
+
+        [[nodiscard]] Format makeColorFormat() const;
+
+        [[nodiscard]] RenderPass makeRenderPass(std::vector<RenderAttachment>&) const;
 
     private:
         Instance instance;
@@ -143,11 +158,75 @@ namespace zen {
 
         void create();
 
-        static VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+        static VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
-        static VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
+        static VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-        static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, VkExtent2D windowExtent);
+        static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, VkExtent2D windowExtent);
+    };
+
+    struct Format {
+        VkFormat format = VK_FORMAT_UNDEFINED;
+
+        [[nodiscard]] bool isSupportedColorAttachment(const Device& device) const;
+        [[nodiscard]] bool isSupportedDepthAttachment(const Device& device) const;
+    };
+
+    enum class Operation {
+        Store,
+        Clear,
+        DontCare,
+    };
+
+    VkAttachmentStoreOp toVulkanStoreOp(Operation operation);
+
+    VkAttachmentLoadOp toVulkanLoadOp(Operation operation);
+
+    enum class AttachmentLayout {
+        ColorAttachment,
+        DepthAttachment,
+    };
+
+    class RenderAttachment {
+    public:
+        VkAttachmentDescription description{};
+        VkAttachmentReference reference{};
+        Operation loadOperation = Operation::Clear;
+        Operation storeOperation = Operation::Store;
+        Format format{};
+        AttachmentLayout layout = AttachmentLayout::ColorAttachment;
+        int attachmentIndex = -1;
+
+        void makeRenderAttachment();
+    };
+
+    class RenderPass {
+    public:
+        VkRenderPass renderPass = VK_NULL_HANDLE;
+        std::vector<RenderAttachment> attachments = {};
+
+        void addAttachment(const RenderAttachment& attachment) {
+            attachments.push_back(attachment);
+        }
+
+        void create(const Device& device);
+    };
+
+    class ShaderModule {
+    public:
+        VkShaderModule shaderModule = VK_NULL_HANDLE;
+
+        static ShaderModule loadFromSource(const std::string& source, const Device& device);
+    };
+
+    class ShaderProgram {
+    public:
+        std::vector<VkShaderModule> shaderModules = {};
+    };
+
+    class RenderingPipeline {
+    public:
+        VkPipeline pipeline = VK_NULL_HANDLE;
     };
 };
 

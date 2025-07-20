@@ -23,8 +23,18 @@ int main() {
     auto device = zen::Device::makeDefaultDevice(window.acquireInstance());
     auto presentable = device->makePresentable();
 
-    while (!window.shouldClose()) {
+    std::vector<zen::RenderAttachment> attachments;
 
+    zen::RenderAttachment colorAttachment;
+    colorAttachment.layout = zen::AttachmentLayout::ColorAttachment;
+    colorAttachment.format = device->makeColorFormat();
+    colorAttachment.attachmentIndex = 0;
+
+    attachments.emplace_back(colorAttachment);
+
+    zen::RenderPass renderPass = device->makeRenderPass(attachments);
+
+    while (!window.shouldClose()) {
     }
     return 0;
 }

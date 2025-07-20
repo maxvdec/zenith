@@ -17,7 +17,10 @@ add_library(Zenith SHARED
         vulkan/utils/extensions.cpp
         vulkan/utils/errors.cpp
         vulkan/device.cpp
-        vulkan/presentable.cpp)
+        vulkan/presentable.cpp
+        vulkan/formats.cpp
+        vulkan/pipeline.cpp
+        vulkan/shaders.cpp)
 
 target_include_directories(Zenith PUBLIC include)
 target_compile_options(Zenith PRIVATE
