@@ -14,6 +14,11 @@
 
 using namespace zen;
 
+struct Vertex {
+    glm::vec3 position;
+    glm::vec4 color;
+};
+
 int main() {
     zen::glfw::WindowConfiguration config{};
     config.name = "Zenith Triangle Example";
@@ -76,7 +81,7 @@ void main() {
 
     InputDescriptorItem<glm::vec4> color;
     color.location = 1;
-    color.format = InputFormat::Color;
+    color.format = InputFormat::Vector4;
     inputDescriptor.addItem(color);
 
     device->useInputDescriptor(inputDescriptor);
@@ -88,10 +93,21 @@ void main() {
 
     pipeline.makePipeline();
 
+    std::vector<Vertex> vertices(3);
+    vertices[0] = {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)};
+    vertices[1] = {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)};
+    vertices[2] = {glm::vec3(0.0f, 0.5f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)};
+
+    Buffer vertexBuffer = device->makeBuffer(vertices);
+
     while (!window.shouldClose()) {
         auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
         commandBuffer->beginRendering();
+
+        commandBuffer->bindVertexBuffer(vertexBuffer);
+        commandBuffer->draw(3, false);
+
         commandBuffer->endRendering();
         commandBuffer->end();
         commandBuffer->submit();

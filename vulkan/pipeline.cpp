@@ -144,6 +144,7 @@ void RenderPass::create(Device& device, const Presentable& presentable) {
 
 void InputDescriptor::buildInputLayout() {
     int size = 0;
+    uint32_t offset = 0;
     for (const auto& item : items) {
         size += static_cast<int>(item->getSize());
     }
@@ -158,7 +159,8 @@ void InputDescriptor::buildInputLayout() {
         attributes[i].location = item->getLocation();
         attributes[i].binding = binding.binding;
         attributes[i].format = zen::toVulkanFormat(item->getFormat());
-        attributes[i].offset = static_cast<uint32_t>(i * item->getSize());
+        attributes[i].offset = offset;
+        offset += static_cast<uint32_t>(item->getSize());
     }
 }
 
@@ -196,9 +198,9 @@ void RenderPipeline::makePipeline() {
     // We set the viewport and scissor state
     VkViewport viewport{};
     viewport.x = 0.0f;
-    viewport.y = 0.0f;
+    viewport.y = static_cast<float>(device.instance.extent.height); // Start from bottom
     viewport.width = static_cast<float>(device.instance.extent.width);
-    viewport.height = static_cast<float>(device.instance.extent.height);
+    viewport.height = -static_cast<float>(device.instance.extent.height); // Negative height flips Y
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     VkRect2D scissor{};
@@ -221,7 +223,7 @@ void RenderPipeline::makePipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // <- wireframe for debug?
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     info.pRasterizationState = &rasterizer;

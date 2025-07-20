@@ -96,6 +96,31 @@ namespace zen {
 
     class RenderPipeline;
 
+    class Buffer {
+    public:
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+
+        template <typename T>
+        void uploadData(const std::vector<T>& data, Device& device) {
+            pushData(
+                std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(data.data()),
+                                     reinterpret_cast<const uint8_t*>(data.data() + data.size())),
+                sizeof(T) * data.size(),
+                device
+            );
+        }
+
+        void destroy(const Device& device);
+
+        [[nodiscard]] bool isValid() const {
+            return buffer != VK_NULL_HANDLE && memory != VK_NULL_HANDLE;
+        }
+
+    private:
+        void pushData(const std::vector<uint8_t>& data, int size, Device& device);
+    };
+
     class CommandBuffer {
     public:
         CommandBuffer(const RenderPipeline& pipeline, VkCommandPool commandPool,
@@ -110,6 +135,9 @@ namespace zen {
 
         void present() const;
         void submit() const;
+
+        void bindVertexBuffer(const Buffer& buffer) const;
+        void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
 
@@ -184,8 +212,17 @@ namespace zen {
 
         void makeCommandPool();
 
+        template <typename T>
+        Buffer makeBuffer(std::vector<T>& data) {
+            Buffer buffer;
+            buffer.uploadData(data, *this);
+            return buffer;
+        }
+
         [[nodiscard]] CoreQueue getGraphicsQueue() const;
         [[nodiscard]] CoreQueue getPresentQueue() const;
+
+        [[nodiscard]] uint32_t vkFindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
         Instance instance;
 

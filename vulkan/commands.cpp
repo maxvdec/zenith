@@ -36,6 +36,11 @@ CommandBuffer::CommandBuffer(const RenderPipeline& pipeline, VkCommandPool comma
     this->inUse = true;
     this->pipeline = pipeline.pipeline;
     this->renderPass = pipeline.renderPass.renderPass;
+
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    vkCreateSemaphore(device.logicalDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphore);
+    vkCreateSemaphore(device.logicalDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphore);
 }
 
 void CommandBuffer::beginRendering() {
@@ -58,6 +63,8 @@ void CommandBuffer::beginRendering() {
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
 void CommandBuffer::endRendering() const {
@@ -87,8 +94,15 @@ void CommandBuffer::submit() const {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
     submitInfo.waitSemaphoreCount = 1;
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.pWaitDstStageMask = waitStages;
+
+    assert(imageAvailableSemaphore != VK_NULL_HANDLE);
+    assert(renderFinishedSemaphore != VK_NULL_HANDLE);
+
+    assert(presentable.swapchain != VK_NULL_HANDLE);
+    assert(commandBuffer != VK_NULL_HANDLE);
+    assert(device.logicalDevice != VK_NULL_HANDLE);
 
     VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
     VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
@@ -99,10 +113,26 @@ void CommandBuffer::submit() const {
     submitInfo.pWaitSemaphores = waitSemaphores;
 
     VkQueue graphicsQueue = device.getGraphicsQueue().queue;
+    assert(graphicsQueue != VK_NULL_HANDLE);
 
     vkQueueSubmit(graphicsQueue, 1,
                   &submitInfo, VK_NULL_HANDLE
     );
+}
+
+void CommandBuffer::bindVertexBuffer(const Buffer& buffer) const {
+    VkBuffer buffers[] = {buffer.buffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
+}
+
+void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
+    if (indexed) {
+        vkCmdDrawIndexed(commandBuffer, vertexCount, 1, 0, 0, 0);
+    }
+    else {
+        vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0);
+    }
 }
 
 
