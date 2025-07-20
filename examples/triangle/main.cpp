@@ -67,7 +67,7 @@ void main() {
 
     ShaderProgram shaderProgram({vertexShader, fragmentShader});
 
-    InputDescriptor<2> inputDescriptor;
+    InputDescriptor inputDescriptor;
 
     InputDescriptorItem<glm::vec3> position;
     position.location = 0;
@@ -81,7 +81,17 @@ void main() {
 
     device->useInputDescriptor(inputDescriptor);
 
+    RenderPipeline pipeline = device->makeRenderPipeline();
+    pipeline.inputDescriptor = inputDescriptor;
+    pipeline.renderPass = renderPass;
+    pipeline.shaderProgram = shaderProgram;
+
+    pipeline.makePipeline();
+
     while (!window.shouldClose()) {
+        auto commandBuffer = device->requestCommandBuffer();
+        commandBuffer->begin();
+        commandBuffer->end();
     }
     return 0;
 }

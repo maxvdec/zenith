@@ -21,7 +21,8 @@ add_library(Zenith SHARED
         vulkan/presentable.cpp
         vulkan/formats.cpp
         vulkan/pipeline.cpp
-        vulkan/shaders.cpp)
+        vulkan/shaders.cpp
+        vulkan/commands.cpp)
 
 target_include_directories(Zenith PUBLIC include)
 target_compile_options(Zenith PRIVATE

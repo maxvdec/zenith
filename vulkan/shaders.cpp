@@ -13,6 +13,7 @@
 #include <glslang/SPIRV/GlslangToSpv.h>
 #include <glslang/Include/ResourceLimits.h>
 #include <zenith/zenith_vulkan.h>
+#include <iostream>
 
 using namespace zen;
 
@@ -36,7 +37,7 @@ ShaderModule ShaderModule::loadFromSource(const std::string& source, const Devic
     glslang::TShader shader(toGlslShaderType(type));
     shader.setStrings(shaderStrings, 1);
 
-    shader.setEnvInput(glslang::EShSourceGlsl, toGlslShaderType(type), glslang::EShClientVulkan, 100);
+    shader.setEnvInput(glslang::EShSourceGlsl, toGlslShaderType(type), glslang::EShClientVulkan, 450);
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_2);
     shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
 
@@ -136,7 +137,7 @@ ShaderModule ShaderModule::loadFromSource(const std::string& source, const Devic
 
     auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules);
 
-    if (!shader.parse(&resources, 100, false, messages)) {
+    if (!shader.parse(&resources, 450, false, messages)) {
         glslang::FinalizeProcess();
         std::string errorMessage = std::string(shader.getInfoLog()) + "\n" + shader.getInfoDebugLog();
         throw std::runtime_error("Failed to parse shader: " + errorMessage);
@@ -198,20 +199,30 @@ void ShaderSpecializationInformation::createSpecializationInfo() {
     specializationInfo.pData = specializationData.data();
 }
 
+VkShaderStageFlagBits zen::toVulkanShaderStage(ShaderType type) {
+    switch (type) {
+    case ShaderType::Vertex:
+        return VK_SHADER_STAGE_VERTEX_BIT;
+    case ShaderType::Fragment:
+        return VK_SHADER_STAGE_FRAGMENT_BIT;
+    default:
+        return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM; // Invalid type
+    }
+}
+
 void ShaderModule::compile(std::string entryPoint, ShaderSpecializationInformation info) {
-    VkPipelineShaderStageCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    createInfo.stage = static_cast<VkShaderStageFlagBits>(type);
-    createInfo.module = shaderModule;
-    createInfo.pName = entryPoint.c_str();
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = toVulkanShaderStage(type);
+    shaderStageInfo.module = shaderModule;
+    this->entryPoint = std::move(entryPoint);
+    shaderStageInfo.pName = this->entryPoint.c_str();
     if (!info.specializationInfo.pData || info.specializationInfo.dataSize == 0) {
-        createInfo.pSpecializationInfo = nullptr; // No specialization info
+        shaderStageInfo.pSpecializationInfo = nullptr; // No specialization info
     }
     else {
         info.createSpecializationInfo();
-        createInfo.pSpecializationInfo = &info.specializationInfo;
+        shaderStageInfo.pSpecializationInfo = &info.specializationInfo;
     }
-    entryPoint = createInfo.pName; // Store the entry point for later use
     specializationInfo = std::move(info); // Store the specialization info
 }
 

@@ -37,7 +37,7 @@ VkFormat zen::toVulkanFormat(InputFormat format) {
     case InputFormat::Vector4:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
     case InputFormat::Color:
-        return VK_FORMAT_B8G8R8A8_SRGB; // Common color format
+        return VK_FORMAT_R32G32B32A32_SFLOAT; // Assuming color is represented as a vec4
     case InputFormat::Float:
         return VK_FORMAT_R32_SFLOAT;
     case InputFormat::Int:

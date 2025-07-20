@@ -14,6 +14,8 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <iostream>
+#include <optional>
 
 using namespace zen;
 
@@ -346,9 +348,56 @@ ShaderModule Device::makeShader(const std::vector<uint32_t>& code, ShaderType ty
     return ShaderModule::loadFromCompiled(code, *this, type);
 }
 
-template <int N>
-void Device::useInputDescriptor(InputDescriptor<N>& inputDescriptor) const {
-    inputDescriptor.buildInputLayout(); // We build the input layout for the descriptor
+void Device::useInputDescriptor(InputDescriptor& inputDescriptor) const {
+    inputDescriptor.buildInputLayout();
+}
+
+RenderPipeline Device::makeRenderPipeline() const {
+    return RenderPipeline(*this); // We create a render pipeline with the current device
+}
+
+void Device::makeCommandPool() {
+    // If we don't have a command pool or command buffer, we create them
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    CoreQueue graphicsQueue = getQueueFromCapability(DeviceCapabilities::Graphics).front();
+    poolInfo.queueFamilyIndex = graphicsQueue.familyIndex;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // We allow resetting command buffers
+
+    VkCommandPool commandPool = VK_NULL_HANDLE;
+    VkResult result = vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &commandPool);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create command pool. Error: " + zen::getVulkanErrorString(result));
+    }
+
+    this->commandPool = commandPool;
+}
+
+std::shared_ptr<CommandBuffer> Device::requestCommandBuffer() {
+    if (!commandPool.has_value()) {
+        makeCommandPool();
+    }
+
+    for (const auto& cmdBuffer : commandBuffers) {
+        if (!cmdBuffer->inUse) {
+            return cmdBuffer;
+        }
+    }
+
+    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool.value();
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // We create a primary command buffer
+    allocInfo.commandBufferCount = 1; // We allocate one command buffer
+    VkResult result = vkAllocateCommandBuffers(logicalDevice, &allocInfo, &commandBuffer);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate command buffer. Error: " + zen::getVulkanErrorString(result));
+    }
+    CommandBuffer buffer = {commandPool.value(), commandBuffer};
+    buffer.inUse = true;
+    commandBuffers.push_back(std::make_shared<CommandBuffer>(buffer));
+    return commandBuffers.back();
 }
 
 

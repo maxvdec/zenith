@@ -15,7 +15,7 @@
 #include <vulkan/vulkan.hpp>
 #include <functional>
 
-#include "../../../../../../../opt/homebrew/Cellar/glslang/15.4.0/include/glslang/Public/ShaderLang.h"
+#include "glslang/Public/ShaderLang.h"
 
 namespace zen {
     struct Instance {
@@ -92,8 +92,25 @@ namespace zen {
 
     enum class ShaderType;
 
-    template <int N>
     class InputDescriptor;
+
+    class RenderPipeline;
+
+    class CommandBuffer {
+    public:
+        CommandBuffer(VkCommandPool commandPool = VK_NULL_HANDLE, VkCommandBuffer commandBuffer = VK_NULL_HANDLE)
+            : commandPool(commandPool), commandBuffer(commandBuffer) {
+        }
+
+        void begin() const;
+        void end();
+
+        bool inUse;
+
+    private:
+        [[maybe_unused]] VkCommandPool commandPool = VK_NULL_HANDLE;
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+    };
 
     class Device {
     public:
@@ -141,15 +158,24 @@ namespace zen {
 
         [[nodiscard]] ShaderModule makeShader(const std::vector<uint32_t>& code, ShaderType type) const;
 
-        template <int N>
-        void useInputDescriptor(InputDescriptor<N>& inputDescriptor) const;
+        [[nodiscard]] RenderPipeline makeRenderPipeline() const;
 
-    private:
+        void useInputDescriptor(InputDescriptor& inputDescriptor) const;
+
+        [[nodiscard]] std::shared_ptr<CommandBuffer> requestCommandBuffer();
+
+        void makeCommandPool();
+
         Instance instance;
 
+    private:
         void findQueueFamilies();
 
         void initializeLogicalDevice();
+
+        std::optional<VkCommandPool> commandPool = std::nullopt;
+
+        std::vector<std::shared_ptr<CommandBuffer>> commandBuffers;
     };
 
     struct Image {
@@ -235,6 +261,8 @@ namespace zen {
 
     EShLanguage toGlslShaderType(ShaderType type);
 
+    VkShaderStageFlagBits toVulkanShaderStage(ShaderType type);
+
 
     struct CoreShaderSpecializationValueInterface {
         virtual ~CoreShaderSpecializationValueInterface() = default;
@@ -286,6 +314,7 @@ namespace zen {
         ShaderType type = ShaderType::Vertex;
         std::string entryPoint;
         ShaderSpecializationInformation specializationInfo;
+        VkPipelineShaderStageCreateInfo shaderStageInfo = {};
 
         static ShaderModule loadFromSource(const std::string& source, const Device& device, ShaderType type);
         static ShaderModule loadFromCompiled(const std::vector<uint32_t>& code, const Device& device, ShaderType type);
@@ -295,11 +324,18 @@ namespace zen {
 
     class ShaderProgram {
     public:
-        std::vector<ShaderModule> shaderModules = {};
+        std::vector<std::reference_wrapper<ShaderModule>> shaderModules = {};
 
-        ShaderProgram() = default;
+        template <typename... ShaderModules>
+        explicit ShaderProgram(ShaderModules&... modules) {
+            (shaderModules.emplace_back(std::ref(modules)), ...);
+        }
 
-        explicit ShaderProgram(std::vector<ShaderModule> shaderModules) : shaderModules(std::move(shaderModules)) {
+        explicit ShaderProgram(const std::vector<std::reference_wrapper<ShaderModule>>& modules)
+            : shaderModules(modules) {
+            if (modules.empty()) {
+                throw std::runtime_error("ShaderProgram: No shader modules provided");
+            }
         }
     };
 
@@ -341,33 +377,19 @@ namespace zen {
     };
 
 
-    template <int N>
     class InputDescriptor {
     public:
-        std::array<VkVertexInputAttributeDescription, N> attributes = {};
+        std::vector<VkVertexInputAttributeDescription> attributes;
         VkVertexInputBindingDescription binding = {};
-        std::vector<std::unique_ptr<InputDescriptorItemInterface>> items;
+        std::vector<std::shared_ptr<InputDescriptorItemInterface>> items;
 
         InputDescriptor() = default;
-
-        InputDescriptor(InputDescriptor&&) noexcept = default;
-
-        InputDescriptor& operator=(InputDescriptor&&) noexcept = default;
-
-        InputDescriptor(const InputDescriptor&) = delete;
-
-        InputDescriptor& operator=(const InputDescriptor&) = delete;
 
         void buildInputLayout();
 
         template <typename T>
         inline void addItem(const InputDescriptorItem<T>& item) {
-            if (items.size() < N) {
-                items.push_back(std::make_unique<InputDescriptorItem<T>>(item));
-            }
-            else {
-                throw std::runtime_error("InputDescriptor: Too many items added");
-            }
+            items.push_back(std::make_shared<InputDescriptorItem<T>>(item));
         }
 
         [[nodiscard]] inline size_t getSize() const {
@@ -379,11 +401,19 @@ namespace zen {
         }
     };
 
-
     class RenderPipeline {
     public:
         VkPipeline pipeline = VK_NULL_HANDLE;
         ShaderProgram shaderProgram = ShaderProgram();
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        InputDescriptor inputDescriptor = {};
+        RenderPass renderPass = RenderPass();
+        const Device& device;
+
+        explicit RenderPipeline(const Device& device) : device(device) {
+        }
+
+        void makePipeline();
     };
 };
 
