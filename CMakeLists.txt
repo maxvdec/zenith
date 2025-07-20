@@ -9,6 +9,7 @@ option(ZENITH_GLFW "Enable GLFW windowing support" ON)
 option(ZENITH_VULKAN "Enable Vulkan support" ON)
 
 find_package(Vulkan REQUIRED)
+find_package(glslang REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
@@ -30,7 +31,7 @@ target_compile_options(Zenith PRIVATE
         -Werror
 )
 
-target_link_libraries(Zenith PUBLIC Vulkan::Vulkan)
+target_link_libraries(Zenith PUBLIC Vulkan::Vulkan glslang::glslang)
 
 if (APPLE)
     message(STATUS "macOS detected - configuring MoltenVK")

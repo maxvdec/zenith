@@ -15,6 +15,8 @@
 #include <vulkan/vulkan.hpp>
 #include <functional>
 
+#include "../../../../../../../opt/homebrew/Cellar/glslang/15.4.0/include/glslang/Public/ShaderLang.h"
+
 namespace zen {
     struct Instance {
         VkInstance instance;
@@ -212,11 +214,20 @@ namespace zen {
         void create(const Device& device);
     };
 
+    enum class ShaderType {
+        Vertex,
+        Fragment,
+    };
+
+    EShLanguage toGlslShaderType(ShaderType type);
+
     class ShaderModule {
     public:
         VkShaderModule shaderModule = VK_NULL_HANDLE;
+        ShaderType type = ShaderType::Vertex;
 
-        static ShaderModule loadFromSource(const std::string& source, const Device& device);
+        static ShaderModule loadFromSource(const std::string& source, const Device& device, ShaderType type);
+        static ShaderModule loadFromCompiled(const std::vector<uint32_t>& code, const Device& device, ShaderType type);
     };
 
     class ShaderProgram {
