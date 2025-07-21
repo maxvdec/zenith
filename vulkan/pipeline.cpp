@@ -264,8 +264,8 @@ void RenderPipeline::makePipeline() {
     // We set the layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // no descriptor sets
-    pipelineLayoutInfo.pSetLayouts = nullptr;
+    pipelineLayoutInfo.setLayoutCount = 1; // no descriptor sets
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
     pipelineLayoutInfo.pushConstantRangeCount = 0; // no push constants
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -281,6 +281,83 @@ void RenderPipeline::makePipeline() {
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline. Error: " + zen::getVulkanErrorString(result));
     }
+}
+
+void RenderPipeline::bindUniformBlock(UniformBlock& uniformBlock) {
+    uniformBlocks.push_back(std::make_shared<UniformBlock>(uniformBlock));
+    recalculateUniforms();
+}
+
+void RenderPipeline::recalculateUniforms() {
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    bindings.reserve(uniformBlocks.size());
+    for (uint32_t i = 0; i < uniformBlocks.size(); i++) {
+        bindings.push_back({
+            .binding = i,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            // We use both vertex and fragment stages
+            .pImmutableSamplers = nullptr // No samplers for uniform buffers
+        });
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+    VkResult result = vkCreateDescriptorSetLayout(device.logicalDevice, &layoutInfo, nullptr, &descriptorSetLayout);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor set layout. Error: " + zen::getVulkanErrorString(result));
+    }
+
+    // We create the descriptor pool
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    poolSizes.reserve(bindings.size());
+    for (const auto& b : bindings) {
+        poolSizes.push_back({.type = b.descriptorType, .descriptorCount = 1});
+    }
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = static_cast<uint32_t>(uniformBlocks.size());
+
+    result = vkCreateDescriptorPool(device.logicalDevice, &poolInfo, nullptr, &descriptorPool);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create descriptor pool. Error: " + zen::getVulkanErrorString(result));
+    }
+
+    // We allocate the descriptor set
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = 1; // We allocate one descriptor set
+    allocInfo.pSetLayouts = &descriptorSetLayout;
+
+    VkResult allocResult = vkAllocateDescriptorSets(device.logicalDevice, &allocInfo, &descriptorSet);
+    if (allocResult != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate descriptor set. Error: " + zen::getVulkanErrorString(allocResult));
+    }
+
+    // We create the write descriptor sets
+    std::vector<VkWriteDescriptorSet> descriptorWrites;
+    for (uint32_t i = 0; i < uniformBlocks.size(); ++i) {
+        descriptorWrites.push_back({
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = descriptorSet,
+            .dstBinding = i,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &uniformBlocks[i]->descriptorBufferInfo
+        });
+    }
+
+    vkUpdateDescriptorSets(device.logicalDevice, static_cast<uint32_t>(descriptorWrites.size()),
+                           descriptorWrites.data(),
+                           0, nullptr
+    );
 }
 
 

@@ -146,6 +146,7 @@ namespace zen {
 
         void bindVertexBuffer(const Buffer& buffer) const;
         void bindIndexBuffer(const Buffer& buffer, IndexType type) const;
+        void bindUniforms(const RenderPipeline& pipeline) const;
         void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
@@ -470,6 +471,8 @@ namespace zen {
         }
     };
 
+    class UniformBlock;
+
     class RenderPipeline {
     public:
         VkPipeline pipeline = VK_NULL_HANDLE;
@@ -483,6 +486,34 @@ namespace zen {
         }
 
         void makePipeline();
+        void bindUniformBlock(UniformBlock& uniformBlock);
+
+        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+
+    private:
+        std::vector<std::shared_ptr<UniformBlock>> uniformBlocks;
+        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+
+        void recalculateUniforms();
+    };
+
+    class UniformBlock {
+    public:
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkDescriptorBufferInfo descriptorBufferInfo = {};
+
+        UniformBlock(Device& device) : device(device) {
+        }
+
+        void create(const Device& device, size_t size);
+        void destroy(const Device& device);
+        void uploadData(void* data);
+
+    private:
+        size_t size = 0;
+        Device& device;
     };
 };
 

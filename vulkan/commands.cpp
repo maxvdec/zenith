@@ -144,6 +144,18 @@ void CommandBuffer::bindIndexBuffer(const Buffer& buffer, IndexType type) const 
     vkCmdBindIndexBuffer(commandBuffer, buffer.buffer, 0, getIndexType(type));
 }
 
+void CommandBuffer::bindUniforms(const RenderPipeline& pipeline) const {
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline.pipelineLayout, // Must match the one used in pipeline creation
+        0, // First set
+        1, // Descriptor set count
+        &pipeline.descriptorSet, // The descriptor set created earlier
+        0, nullptr // Dynamic offsets, if any (not needed for static uniforms)
+    );
+}
+
 
 void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
     if (indexed) {
