@@ -54,7 +54,7 @@ layout(set = 0, binding = 1) uniform sampler2D textureSampler;
 
 layout(location = 0) out vec4 outColor;
 void main() {
-    vec4 textureColor = texture(textureSampler, fragTexCoord);
+    vec4 textureColor = texture(textureSampler, fragTexCoord) * fragColor.a;
     outColor = textureColor;
 }
 )";
@@ -147,7 +147,7 @@ int main() {
         commandBuffer->bindVertexBuffer(vertexBuffer);
         commandBuffer->bindIndexBuffer(indexBuffer, IndexType::UInt32);
 
-        commandBuffer->bindTexture(texture, 0, pipeline);
+        commandBuffer->bindTexture(pipeline);
 
         commandBuffer->draw(6, true);
 

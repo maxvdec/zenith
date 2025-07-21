@@ -159,9 +159,9 @@ namespace zen {
 
         void bindVertexBuffer(const Buffer& buffer) const;
         void bindIndexBuffer(const Buffer& buffer, IndexType type) const;
-        void bindUniforms(const RenderPipeline& pipeline) const;
+        void bindUniforms(const RenderPipeline& pipeline);
         void activateTexture(Texture& texture, Device& device);
-        void bindTexture(const Texture& texture, uint32_t index, RenderPipeline& pipeline) const;
+        void bindTexture(RenderPipeline& pipeline);
         void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
@@ -177,6 +177,7 @@ namespace zen {
         Presentable& presentable;
         int imageIndex = 0;
         Device& device;
+        bool resourcesBound = false;
     };
 
     struct Framebuffer {

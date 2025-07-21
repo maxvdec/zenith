@@ -295,6 +295,11 @@ void RenderPipeline::attachUniformBlock(UniformBlock& uniformBlock) {
 }
 
 void RenderPipeline::recalculateDescriptors() {
+    if (descriptorSet != VK_NULL_HANDLE || descriptorPool != VK_NULL_HANDLE) {
+        // If we already have a descriptor set and pool, we need to destroy them first
+        vkDestroyDescriptorSetLayout(device.logicalDevice, descriptorSetLayout, nullptr);
+        vkDestroyDescriptorPool(device.logicalDevice, descriptorPool, nullptr);
+    }
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     bindings.reserve(uniformBlocks.size());
     for (uint32_t i = 0; i < uniformBlocks.size(); i++) {

@@ -19,10 +19,10 @@ using namespace zen;
 
 void zen::texture::TextureData::load(const std::string& path) {
     int width, height, channels;
-    stbi_uc* imageData = stbi_load(path.c_str(), &width, &height, &channels, 0);
+    stbi_uc* imageData = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
     this->width = static_cast<uint32_t>(width);
     this->height = static_cast<uint32_t>(height);
-    size = width * height * channels;
+    size = width * height * 4;
     if (!imageData) {
         throw std::runtime_error("Failed to load texture image: " + path);
     }

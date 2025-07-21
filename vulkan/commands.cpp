@@ -27,6 +27,7 @@ void CommandBuffer::begin() const {
 void CommandBuffer::end() {
     vkEndCommandBuffer(commandBuffer);
     inUse = false;
+    resourcesBound = false;
 }
 
 CommandBuffer::CommandBuffer(const RenderPipeline& pipeline, VkCommandPool commandPool, VkCommandBuffer commandBuffer,
@@ -144,7 +145,11 @@ void CommandBuffer::bindIndexBuffer(const Buffer& buffer, IndexType type) const 
     vkCmdBindIndexBuffer(commandBuffer, buffer.buffer, 0, getIndexType(type));
 }
 
-void CommandBuffer::bindUniforms(const RenderPipeline& pipeline) const {
+void CommandBuffer::bindUniforms(const RenderPipeline& pipeline) {
+    if (resourcesBound) {
+        return;
+    }
+    resourcesBound = true;
     vkCmdBindDescriptorSets(
         commandBuffer,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -156,14 +161,18 @@ void CommandBuffer::bindUniforms(const RenderPipeline& pipeline) const {
     );
 }
 
-void CommandBuffer::bindTexture(const Texture& texture, uint32_t index, RenderPipeline& pipeline) const {
+void CommandBuffer::bindTexture(RenderPipeline& pipeline) {
+    if (resourcesBound) {
+        return;
+    }
+    resourcesBound = true;
     vkCmdBindDescriptorSets(
         commandBuffer,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         pipeline.pipelineLayout, // Must match the one used in pipeline creation
-        index, // First set
+        0, // First set
         1, // Descriptor set count
-        &texture.descriptorSet, // The descriptor set created earlier
+        &pipeline.descriptorSet, // The descriptor set created earlier
         0, nullptr // Dynamic offsets, if any (not needed for static textures)
     );
 }
