@@ -166,5 +166,9 @@ void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
     }
 }
 
+void CommandBuffer::activateTexture(Texture& texture) {
+    texture.activateTexture(*this);
+}
+
 
 #endif

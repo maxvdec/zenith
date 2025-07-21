@@ -119,9 +119,17 @@ int main() {
 
     Buffer indexBuffer = device->makeBuffer(indices);
 
+    auto textureData = texture::TextureData();
+    std::string projectRoot = PROJECT_ROOT_PATH;
+    textureData.load(projectRoot + "/examples/textured_cube/texture.jpg");
+    auto texture = device->createTexture(textureData);
+
     while (!window.shouldClose()) {
+        uniforms.time = glfwGetTime();
+        uniformBlock.uploadData(&uniforms);
         auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
+        commandBuffer->activateTexture(texture);
         commandBuffer->beginRendering();
         commandBuffer->bindUniforms(pipeline);
 

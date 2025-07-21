@@ -15,7 +15,18 @@
 #include <vulkan/vulkan.hpp>
 #include <functional>
 
+#ifdef ZENITH_EXT_TEXTURE
+#include <zenith/texture.h>
+#endif
+
+#include "texture.h"
 #include "glslang/Public/ShaderLang.h"
+
+#ifdef ZENITH_EXT_TEXTURE
+namespace zen::texture {
+    class TextureData;
+}
+#endif
 
 namespace zen {
     struct Instance {
@@ -127,6 +138,8 @@ namespace zen {
         UInt8,
     };
 
+    class Texture;
+
     VkIndexType getIndexType(IndexType type);
 
     class CommandBuffer {
@@ -147,13 +160,15 @@ namespace zen {
         void bindVertexBuffer(const Buffer& buffer) const;
         void bindIndexBuffer(const Buffer& buffer, IndexType type) const;
         void bindUniforms(const RenderPipeline& pipeline) const;
+        void activateTexture(Texture& texture);
         void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
 
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+
     private:
         [[maybe_unused]] VkCommandPool commandPool = VK_NULL_HANDLE;
-        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkPipeline pipeline = VK_NULL_HANDLE;
         VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
@@ -168,6 +183,7 @@ namespace zen {
     };
 
     class UniformBlock;
+
 
     class Device {
     public:
@@ -218,6 +234,14 @@ namespace zen {
         [[nodiscard]] RenderPipeline makeRenderPipeline() const;
 
         [[nodiscard]] UniformBlock makeUniformBlock(size_t size);
+
+        [[nodiscard]] Texture createTexture(size_t width, size_t height, size_t channels,
+                                            std::shared_ptr<void> data);
+#ifdef ZENITH_EXT_TEXTURE
+#ifdef ZENITH_VULKAN
+        [[nodiscard]] Texture createTexture(zen::texture::TextureData data);
+#endif
+#endif
 
         void useInputDescriptor(InputDescriptor& inputDescriptor) const;
 
@@ -518,6 +542,31 @@ namespace zen {
     private:
         size_t size = 0;
         Device& device;
+    };
+
+    class Texture {
+    public:
+        VkBuffer imageBuffer = VK_NULL_HANDLE;
+        VkSampler sampler = VK_NULL_HANDLE;
+        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        std::shared_ptr<void> imageData = nullptr;
+        VkDeviceMemory imageMemory = VK_NULL_HANDLE;
+        VkDeviceSize imageSize = 0;
+        Image image = {};
+
+        void load(std::shared_ptr<void> imageData, VkDeviceSize imageSize, Device& device, uint32_t width,
+                  uint32_t height);
+
+        void activateTexture(CommandBuffer& commandBuffer) const;
+        void createSampler(Device& device);
+        void createDescriptorSet(Device& device, VkDescriptorSetLayout);
+
+        uint32_t width = 0;
+        uint32_t height = 0;
+
+    private:
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+                         VkImageUsageFlags usage, VkMemoryPropertyFlags properties, Device& device);
     };
 };
 

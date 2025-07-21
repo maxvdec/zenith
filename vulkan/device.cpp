@@ -10,6 +10,7 @@
 #ifdef ZENITH_VULKAN
 
 #include <zenith/zenith.h>
+#include <utility>
 #include <vulkan/vulkan.hpp>
 #include <set>
 #include <string>
@@ -451,5 +452,24 @@ UniformBlock Device::makeUniformBlock(size_t size) {
     block.create(*this, size);
     return block;
 }
+
+Texture Device::createTexture(size_t width, size_t height, size_t channels, std::shared_ptr<void> data) {
+    Texture texture;
+    texture.load(std::move(data), width * height * channels, *this, width, height);
+    return texture;
+}
+
+#ifdef ZENITH_EXT_TEXTURE
+
+#include <zenith/texture.h>
+
+Texture Device::createTexture(zen::texture::TextureData data) {
+    Texture texture;
+    texture.load(std::move(data.data), data.size, *this, data.width, data.height);
+    return texture;
+}
+
+#endif
+
 
 #endif

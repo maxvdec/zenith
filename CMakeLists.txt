@@ -3,8 +3,10 @@ project(Zenith)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(PROJECT_ROOT ${CMAKE_SOURCE_DIR})
 
 option(ZENITH_EXT_WINDOWING "Enable integrated windowing support" ON)
+option(ZENITH_EXT_TEXTURE "Enable integrated texture support" ON)
 option(ZENITH_GLFW "Enable GLFW windowing support" ON)
 option(ZENITH_VULKAN "Enable Vulkan support" ON)
 
@@ -23,7 +25,9 @@ add_library(Zenith SHARED
         vulkan/pipeline.cpp
         vulkan/shaders.cpp
         vulkan/commands.cpp
-        vulkan/buffer.cpp)
+        vulkan/buffer.cpp
+        extensions/texture/texture.cpp
+        vulkan/texture.cpp)
 
 target_include_directories(Zenith PUBLIC include)
 target_compile_options(Zenith PRIVATE
@@ -81,6 +85,11 @@ if (ZENITH_EXT_WINDOWING)
     target_compile_definitions(Zenith PUBLIC ZENITH_EXT_WINDOWING)
 endif ()
 
+if (ZENITH_EXT_TEXTURE)
+    target_compile_definitions(Zenith PUBLIC ZENITH_EXT_TEXTURE)
+    target_include_directories(Zenith PUBLIC external)
+endif ()
+
 if (ZENITH_GLFW)
     target_compile_definitions(Zenith PUBLIC ZENITH_GLFW)
     target_link_libraries(Zenith PUBLIC glfw)
@@ -100,6 +109,10 @@ if (ZENITH_EXT_WINDOWING)
     target_compile_definitions(TriangleTest PRIVATE ZENITH_EXT_WINDOWING)
 endif ()
 
+if (ZENITH_EXT_TEXTURE)
+    target_compile_definitions(TriangleTest PRIVATE ZENITH_EXT_TEXTURE)
+endif ()
+
 if (ZENITH_GLFW)
     target_compile_definitions(TriangleTest PRIVATE ZENITH_GLFW)
 endif ()
@@ -112,6 +125,7 @@ add_executable(TexturedCube examples/textured_cube/main.cpp
         examples/textured_cube/main.cpp)
 target_link_libraries(TexturedCube PRIVATE Zenith glm::glm glfw)
 target_include_directories(TexturedCube PUBLIC include)
+target_compile_definitions(TexturedCube PRIVATE PROJECT_ROOT_PATH="${PROJECT_ROOT}")
 
 if (ZENITH_EXT_WINDOWING)
     target_compile_definitions(TexturedCube PRIVATE ZENITH_EXT_WINDOWING)
