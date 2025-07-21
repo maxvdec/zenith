@@ -108,6 +108,24 @@ if (ZENITH_VULKAN)
     target_compile_definitions(TriangleTest PRIVATE ZENITH_VULKAN)
 endif ()
 
+add_executable(TexturedCube examples/textured_cube/main.cpp
+        examples/textured_cube/main.cpp)
+target_link_libraries(TexturedCube PRIVATE Zenith glm::glm glfw)
+target_include_directories(TexturedCube PUBLIC include)
+
+if (ZENITH_EXT_WINDOWING)
+    target_compile_definitions(TexturedCube PRIVATE ZENITH_EXT_WINDOWING)
+endif ()
+
+if (ZENITH_GLFW)
+    target_compile_definitions(TexturedCube PRIVATE ZENITH_GLFW)
+endif ()
+
+if (ZENITH_VULKAN)
+    target_compile_definitions(TexturedCube PRIVATE ZENITH_VULKAN)
+endif ()
+
+
 if (APPLE AND DEFINED PREFERRED_MOLTENVK_PATH)
     set_target_properties(TriangleTest PROPERTIES
             INSTALL_RPATH "${PREFERRED_MOLTENVK_PATH}"

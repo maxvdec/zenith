@@ -126,6 +126,25 @@ void CommandBuffer::bindVertexBuffer(const Buffer& buffer) const {
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, buffers, offsets);
 }
 
+VkIndexType zen::getIndexType(IndexType type) {
+    switch (type) {
+    case IndexType::UInt32:
+        return VK_INDEX_TYPE_UINT32;
+    case IndexType::UInt16:
+        return VK_INDEX_TYPE_UINT16;
+    case IndexType::UInt8:
+        return VK_INDEX_TYPE_UINT8_EXT; // VK_INDEX_TYPE_UINT8_EXT is used for 8-bit indices
+    default:
+        throw std::runtime_error("Unsupported index type");
+    }
+}
+
+
+void CommandBuffer::bindIndexBuffer(const Buffer& buffer, IndexType type) const {
+    vkCmdBindIndexBuffer(commandBuffer, buffer.buffer, 0, getIndexType(type));
+}
+
+
 void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
     if (indexed) {
         vkCmdDrawIndexed(commandBuffer, vertexCount, 1, 0, 0, 0);

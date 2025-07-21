@@ -121,6 +121,14 @@ namespace zen {
         void pushData(const std::vector<uint8_t>& data, int size, Device& device);
     };
 
+    enum class IndexType {
+        UInt32,
+        UInt16,
+        UInt8,
+    };
+
+    VkIndexType getIndexType(IndexType type);
+
     class CommandBuffer {
     public:
         CommandBuffer(const RenderPipeline& pipeline, VkCommandPool commandPool,
@@ -137,6 +145,7 @@ namespace zen {
         void submit() const;
 
         void bindVertexBuffer(const Buffer& buffer) const;
+        void bindIndexBuffer(const Buffer& buffer, IndexType type) const;
         void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
