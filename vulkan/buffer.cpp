@@ -91,7 +91,7 @@ void UniformBlock::create(const Device& device, size_t size) {
     descriptorBufferInfo.range = size;
 }
 
-void UniformBlock::uploadData(void* data) {
+void UniformBlock::uploadData(void* data) const {
     void* mappedData;
     vkMapMemory(device.logicalDevice, memory, 0, size, 0, &mappedData);
     std::memcpy(mappedData, data, size);

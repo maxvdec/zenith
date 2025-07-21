@@ -24,11 +24,20 @@ constexpr const char* vertexShaderSource = R"(
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec4 inColor;
 
+layout(set = 0, binding = 0) uniform Uniforms {
+    bool enabled;
+    float time;
+} ubo;
+
 layout(location = 0) out vec4 fragColor;
 
 void main() {
     gl_Position = vec4(inPosition, 1.0);
-    fragColor = inColor;
+    if (ubo.enabled) {
+        fragColor = inColor * sin(ubo.time);
+    } else {
+        fragColor = inColor;
+    }
 }
 )";
 
@@ -41,6 +50,11 @@ void main() {
     outColor = fragColor;
 }
 )";
+
+struct Uniforms {
+    bool enabled;
+    float time;
+};
 
 int main() {
     glfw::WindowConfiguration config;
@@ -82,6 +96,11 @@ int main() {
     pipeline.renderPass = renderPass;
     pipeline.shaderProgram = program;
 
+    UniformBlock uniformBlock = device->makeUniformBlock(sizeof(Uniforms));
+    Uniforms uniforms{true, 0.0f};
+    uniformBlock.uploadData(&uniforms);
+    pipeline.bindUniformBlock(uniformBlock);
+
     pipeline.makePipeline();
 
     // We make a square
@@ -104,6 +123,7 @@ int main() {
         auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
         commandBuffer->beginRendering();
+        commandBuffer->bindUniforms(pipeline);
 
         commandBuffer->bindVertexBuffer(vertexBuffer);
         commandBuffer->bindIndexBuffer(indexBuffer, IndexType::UInt32);

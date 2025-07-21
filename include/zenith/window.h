@@ -92,6 +92,10 @@ namespace zen::glfw {
             vulkan.initialize();
         }
 
+        inline float getTime() {
+            return static_cast<float>(glfwGetTime());
+        }
+
         inline void allEvents() {
             glfwPollEvents();
         }

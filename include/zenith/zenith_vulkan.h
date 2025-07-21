@@ -167,6 +167,8 @@ namespace zen {
         VkFramebuffer framebuffer = VK_NULL_HANDLE;
     };
 
+    class UniformBlock;
+
     class Device {
     public:
         DevicePicker picker = DevicePicker::makeDefaultPicker();
@@ -214,6 +216,8 @@ namespace zen {
         [[nodiscard]] ShaderModule makeShader(const std::vector<uint32_t>& code, ShaderType type) const;
 
         [[nodiscard]] RenderPipeline makeRenderPipeline() const;
+
+        [[nodiscard]] UniformBlock makeUniformBlock(size_t size);
 
         void useInputDescriptor(InputDescriptor& inputDescriptor) const;
 
@@ -504,12 +508,12 @@ namespace zen {
         VkDeviceMemory memory = VK_NULL_HANDLE;
         VkDescriptorBufferInfo descriptorBufferInfo = {};
 
-        UniformBlock(Device& device) : device(device) {
+        explicit UniformBlock(Device& device) : device(device) {
         }
 
         void create(const Device& device, size_t size);
         void destroy(const Device& device);
-        void uploadData(void* data);
+        void uploadData(void* data) const;
 
     private:
         size_t size = 0;

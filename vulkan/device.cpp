@@ -446,4 +446,10 @@ uint32_t Device::vkFindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pro
     throw std::runtime_error("Failed to find suitable memory type.");
 }
 
+UniformBlock Device::makeUniformBlock(size_t size) {
+    UniformBlock block(*this);
+    block.create(*this, size);
+    return block;
+}
+
 #endif

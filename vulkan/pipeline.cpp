@@ -264,8 +264,14 @@ void RenderPipeline::makePipeline() {
     // We set the layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1; // no descriptor sets
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    if (descriptorSetLayout != VK_NULL_HANDLE) {
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    }
+    else {
+        pipelineLayoutInfo.setLayoutCount = 0;
+        pipelineLayoutInfo.pSetLayouts = nullptr; // No descriptor set layout
+    }
     pipelineLayoutInfo.pushConstantRangeCount = 0; // no push constants
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
