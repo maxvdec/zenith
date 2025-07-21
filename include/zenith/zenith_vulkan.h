@@ -160,7 +160,8 @@ namespace zen {
         void bindVertexBuffer(const Buffer& buffer) const;
         void bindIndexBuffer(const Buffer& buffer, IndexType type) const;
         void bindUniforms(const RenderPipeline& pipeline) const;
-        void activateTexture(Texture& texture);
+        void activateTexture(Texture& texture, Device& device);
+        void bindTexture(const Texture& texture, uint32_t index, RenderPipeline& pipeline) const;
         void draw(int vertexCount, bool indexed) const;
 
         bool inUse;
@@ -183,6 +184,19 @@ namespace zen {
     };
 
     class UniformBlock;
+
+    class SimpleCommandBuffer {
+    public:
+        void start() const;
+        void endCommitAndDelete();
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+
+        SimpleCommandBuffer(Device& device, VkCommandBuffer buffer) : commandBuffer(buffer), device(device) {
+        }
+
+    private:
+        Device& device;
+    };
 
 
     class Device {
@@ -248,7 +262,12 @@ namespace zen {
         [[nodiscard]] std::shared_ptr<CommandBuffer> requestCommandBuffer(
             RenderPipeline pipeline, Presentable& presentable);
 
-        void makeCommandPool();
+        [[nodiscard]] std::shared_ptr<SimpleCommandBuffer> requestSimpleCommandBuffer();
+
+        void freeCommandBuffer(CommandBuffer& commandBuffer);
+        void freeCommandBuffer(SimpleCommandBuffer& commandBuffer);
+
+        void activateTexture(Texture& texture);
 
         template <typename T>
         Buffer makeBuffer(std::vector<T>& data) {
@@ -270,6 +289,8 @@ namespace zen {
         void findQueueFamilies();
 
         void initializeLogicalDevice();
+
+        void makeCommandPool();
 
         std::optional<VkCommandPool> commandPool = std::nullopt;
 
@@ -514,16 +535,18 @@ namespace zen {
         }
 
         void makePipeline();
-        void bindUniformBlock(UniformBlock& uniformBlock);
+        void attachUniformBlock(UniformBlock& uniformBlock);
+        void attachTexture(Texture& texture);
 
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 
     private:
         std::vector<std::shared_ptr<UniformBlock>> uniformBlocks;
+        std::vector<std::shared_ptr<Texture>> textures;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
-        void recalculateUniforms();
+        void recalculateDescriptors();
     };
 
     class UniformBlock {
@@ -549,17 +572,19 @@ namespace zen {
         VkBuffer imageBuffer = VK_NULL_HANDLE;
         VkSampler sampler = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        VkDescriptorImageInfo imageDescriptorInfo = {};
         std::shared_ptr<void> imageData = nullptr;
         VkDeviceMemory imageMemory = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         VkDeviceSize imageSize = 0;
         Image image = {};
 
         void load(std::shared_ptr<void> imageData, VkDeviceSize imageSize, Device& device, uint32_t width,
                   uint32_t height);
 
-        void activateTexture(CommandBuffer& commandBuffer) const;
+        void activateTexture(Device& device);
         void createSampler(Device& device);
-        void createDescriptorSet(Device& device, VkDescriptorSetLayout);
+        void createDescriptorSet(Device& device, VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool);
 
         uint32_t width = 0;
         uint32_t height = 0;
@@ -567,6 +592,8 @@ namespace zen {
     private:
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                          VkImageUsageFlags usage, VkMemoryPropertyFlags properties, Device& device);
+        void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
+                                   std::shared_ptr<SimpleCommandBuffer> commandBuffer) const;
     };
 };
 

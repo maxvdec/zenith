@@ -156,6 +156,22 @@ void CommandBuffer::bindUniforms(const RenderPipeline& pipeline) const {
     );
 }
 
+void CommandBuffer::bindTexture(const Texture& texture, uint32_t index, RenderPipeline& pipeline) const {
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline.pipelineLayout, // Must match the one used in pipeline creation
+        index, // First set
+        1, // Descriptor set count
+        &texture.descriptorSet, // The descriptor set created earlier
+        0, nullptr // Dynamic offsets, if any (not needed for static textures)
+    );
+}
+
+void CommandBuffer::activateTexture(Texture& texture, Device& device) {
+    texture.activateTexture(device);
+}
+
 
 void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
     if (indexed) {
@@ -166,8 +182,27 @@ void CommandBuffer::draw(const int vertexCount, const bool indexed) const {
     }
 }
 
-void CommandBuffer::activateTexture(Texture& texture) {
-    texture.activateTexture(*this);
+void SimpleCommandBuffer::start() const {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+}
+
+void SimpleCommandBuffer::endCommitAndDelete() {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    VkQueue graphicsQueue = device.getGraphicsQueue().queue;
+    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphicsQueue);
+
+    device.freeCommandBuffer(*this);
 }
 
 

@@ -471,5 +471,33 @@ Texture Device::createTexture(zen::texture::TextureData data) {
 
 #endif
 
+std::shared_ptr<SimpleCommandBuffer> Device::requestSimpleCommandBuffer() {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    if (commandPool == std::nullopt) {
+        makeCommandPool();
+    }
+    allocInfo.commandPool = commandPool.value();
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    vkAllocateCommandBuffers(logicalDevice, &allocInfo, &commandBuffer);
+
+    return std::make_shared<SimpleCommandBuffer>(SimpleCommandBuffer(*this, commandBuffer));
+}
+
+void Device::freeCommandBuffer(CommandBuffer& commandBuffer) {
+    vkFreeCommandBuffers(logicalDevice, commandPool.value(), 1, &commandBuffer.commandBuffer);
+}
+
+void Device::freeCommandBuffer(SimpleCommandBuffer& commandBuffer) {
+    vkFreeCommandBuffers(logicalDevice, commandPool.value(), 1, &commandBuffer.commandBuffer);
+}
+
+void Device::activateTexture(Texture& texture) {
+    texture.activateTexture(*this);
+}
+
 
 #endif

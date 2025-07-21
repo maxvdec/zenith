@@ -17,12 +17,14 @@ using namespace zen;
 struct Vertex {
     glm::vec3 position;
     glm::vec4 color;
+    glm::vec2 texCoord;
 };
 
 constexpr const char* vertexShaderSource = R"(
 #version 450
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec4 inColor;
+layout(location = 2) in vec2 inTexCoord;
 
 layout(set = 0, binding = 0) uniform Uniforms {
     bool enabled;
@@ -30,6 +32,7 @@ layout(set = 0, binding = 0) uniform Uniforms {
 } ubo;
 
 layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 fragTexCoord;
 
 void main() {
     gl_Position = vec4(inPosition, 1.0);
@@ -38,16 +41,21 @@ void main() {
     } else {
         fragColor = inColor;
     }
+    fragTexCoord = inTexCoord;
 }
 )";
 
 constexpr const char* fragmentShaderSource = R"(
 #version 450
 layout(location = 0) in vec4 fragColor;
+layout(location = 1) in vec2 fragTexCoord;
+
+layout(set = 0, binding = 1) uniform sampler2D textureSampler;
 
 layout(location = 0) out vec4 outColor;
 void main() {
-    outColor = fragColor;
+    vec4 textureColor = texture(textureSampler, fragTexCoord);
+    outColor = textureColor;
 }
 )";
 
@@ -88,6 +96,7 @@ int main() {
     InputDescriptor inputDescriptor;
     inputDescriptor.addItem(InputDescriptorItem<glm::vec3>(0, InputFormat::Vector3));
     inputDescriptor.addItem(InputDescriptorItem<glm::vec4>(1, InputFormat::Vector4));
+    inputDescriptor.addItem(InputDescriptorItem<glm::vec2>(2, InputFormat::Vector2));
 
     device->useInputDescriptor(inputDescriptor);
 
@@ -99,16 +108,24 @@ int main() {
     UniformBlock uniformBlock = device->makeUniformBlock(sizeof(Uniforms));
     Uniforms uniforms{true, 0.0f};
     uniformBlock.uploadData(&uniforms);
-    pipeline.bindUniformBlock(uniformBlock);
+    pipeline.attachUniformBlock(uniformBlock);
+
+    auto textureData = texture::TextureData();
+    std::string projectRoot = PROJECT_ROOT_PATH;
+    textureData.load(projectRoot + "/examples/textured_cube/texture.jpg");
+    auto texture = device->createTexture(textureData);
+
+    device->activateTexture(texture);
+    pipeline.attachTexture(texture);
 
     pipeline.makePipeline();
 
     // We make a square
     std::vector<Vertex> vertices(4);
-    vertices[0] = {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)};
-    vertices[1] = {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)};
-    vertices[2] = {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)};
-    vertices[3] = {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 1.0f, 0.0f, 1.0f)};
+    vertices[0] = {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)};
+    vertices[1] = {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), glm::vec2(1.0f, 0.0f)};
+    vertices[2] = {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f)};
+    vertices[3] = {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), glm::vec2(1.0f, 1.0f)};
 
     Buffer vertexBuffer = device->makeBuffer(vertices);
 
@@ -119,22 +136,18 @@ int main() {
 
     Buffer indexBuffer = device->makeBuffer(indices);
 
-    auto textureData = texture::TextureData();
-    std::string projectRoot = PROJECT_ROOT_PATH;
-    textureData.load(projectRoot + "/examples/textured_cube/texture.jpg");
-    auto texture = device->createTexture(textureData);
-
     while (!window.shouldClose()) {
         uniforms.time = glfwGetTime();
         uniformBlock.uploadData(&uniforms);
         auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
-        commandBuffer->activateTexture(texture);
         commandBuffer->beginRendering();
         commandBuffer->bindUniforms(pipeline);
 
         commandBuffer->bindVertexBuffer(vertexBuffer);
         commandBuffer->bindIndexBuffer(indexBuffer, IndexType::UInt32);
+
+        commandBuffer->bindTexture(texture, 0, pipeline);
 
         commandBuffer->draw(6, true);
 

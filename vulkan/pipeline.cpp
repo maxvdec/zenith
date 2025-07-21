@@ -289,12 +289,12 @@ void RenderPipeline::makePipeline() {
     }
 }
 
-void RenderPipeline::bindUniformBlock(UniformBlock& uniformBlock) {
+void RenderPipeline::attachUniformBlock(UniformBlock& uniformBlock) {
     uniformBlocks.push_back(std::make_shared<UniformBlock>(uniformBlock));
-    recalculateUniforms();
+    recalculateDescriptors();
 }
 
-void RenderPipeline::recalculateUniforms() {
+void RenderPipeline::recalculateDescriptors() {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     bindings.reserve(uniformBlocks.size());
     for (uint32_t i = 0; i < uniformBlocks.size(); i++) {
@@ -308,6 +308,17 @@ void RenderPipeline::recalculateUniforms() {
         });
     }
 
+    uint32_t textureBindingStart = static_cast<uint32_t>(uniformBlocks.size());
+    for (uint32_t i = 0; i < textures.size(); i++) {
+        bindings.push_back({
+            .binding = textureBindingStart + i,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Textures typically used in fragment shader
+            .pImmutableSamplers = nullptr
+        });
+    }
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -317,53 +328,86 @@ void RenderPipeline::recalculateUniforms() {
         throw std::runtime_error("Failed to create descriptor set layout. Error: " + zen::getVulkanErrorString(result));
     }
 
-    // We create the descriptor pool
     std::vector<VkDescriptorPoolSize> poolSizes;
-    poolSizes.reserve(bindings.size());
-    for (const auto& b : bindings) {
-        poolSizes.push_back({.type = b.descriptorType, .descriptorCount = 1});
+    if (!uniformBlocks.empty()) {
+        poolSizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = static_cast<uint32_t>(uniformBlocks.size())
+        });
     }
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(uniformBlocks.size());
-
-    result = vkCreateDescriptorPool(device.logicalDevice, &poolInfo, nullptr, &descriptorPool);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create descriptor pool. Error: " + zen::getVulkanErrorString(result));
-    }
-
-    // We allocate the descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 1; // We allocate one descriptor set
-    allocInfo.pSetLayouts = &descriptorSetLayout;
-
-    VkResult allocResult = vkAllocateDescriptorSets(device.logicalDevice, &allocInfo, &descriptorSet);
-    if (allocResult != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate descriptor set. Error: " + zen::getVulkanErrorString(allocResult));
-    }
-
-    // We create the write descriptor sets
-    std::vector<VkWriteDescriptorSet> descriptorWrites;
-    for (uint32_t i = 0; i < uniformBlocks.size(); ++i) {
-        descriptorWrites.push_back({
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = descriptorSet,
-            .dstBinding = i,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &uniformBlocks[i]->descriptorBufferInfo
+    if (!textures.empty()) {
+        poolSizes.push_back({
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = static_cast<uint32_t>(textures.size())
         });
     }
 
-    vkUpdateDescriptorSets(device.logicalDevice, static_cast<uint32_t>(descriptorWrites.size()),
-                           descriptorWrites.data(),
-                           0, nullptr
-    );
+    if (!poolSizes.empty()) {
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = 1; // We create one descriptor set that contains everything
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // Allow freeing individual sets
+
+        result = vkCreateDescriptorPool(device.logicalDevice, &poolInfo, nullptr, &descriptorPool);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor pool. Error: " + zen::getVulkanErrorString(result));
+        }
+
+        // Allocate descriptor set
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &descriptorSetLayout;
+
+        result = vkAllocateDescriptorSets(device.logicalDevice, &allocInfo, &descriptorSet);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate descriptor set. Error: " + zen::getVulkanErrorString(result));
+        }
+
+        // Update descriptor sets
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        // Write uniform buffer descriptors
+        for (uint32_t i = 0; i < uniformBlocks.size(); ++i) {
+            descriptorWrites.push_back({
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = i,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pBufferInfo = &uniformBlocks[i]->descriptorBufferInfo
+            });
+        }
+        // Write texture descriptors
+        for (uint32_t i = 0; i < textures.size(); ++i) {
+            // Ensure texture has valid descriptor info
+            if (textures[i]->imageDescriptorInfo.imageView == VK_NULL_HANDLE || textures[i]->imageDescriptorInfo.sampler
+                == VK_NULL_HANDLE) {
+                throw std::runtime_error("Texture descriptor info not properly initialized");
+            }
+
+            descriptorWrites.push_back({
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptorSet,
+                .dstBinding = textureBindingStart + i,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = &textures[i]->imageDescriptorInfo
+            });
+        }
+
+        vkUpdateDescriptorSets(device.logicalDevice, static_cast<uint32_t>(descriptorWrites.size()),
+                               descriptorWrites.data(), 0, nullptr);
+    }
+}
+
+void RenderPipeline::attachTexture(Texture& texture) {
+    textures.push_back(std::make_shared<Texture>(texture));
+    recalculateDescriptors();
 }
 
 
