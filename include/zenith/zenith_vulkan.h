@@ -568,10 +568,33 @@ namespace zen {
         Device& device;
     };
 
+    enum class TextureFilter {
+        Nearest,
+        Linear,
+    };
+
+    enum class TextureWrap {
+        Repeat,
+        MirroredRepeat,
+        ClampToEdge,
+        ClampToBorder,
+    };
+
+    class TextureSampler {
+    public:
+        VkSampler sampler = VK_NULL_HANDLE;
+        TextureFilter filter = TextureFilter::Linear;
+        TextureWrap wrapS = TextureWrap::Repeat;
+        TextureWrap wrapT = TextureWrap::Repeat;
+        TextureWrap wrapR = TextureWrap::Repeat;
+
+        void createSampler(const Device& device);
+    };
+
     class Texture {
     public:
         VkBuffer imageBuffer = VK_NULL_HANDLE;
-        VkSampler sampler = VK_NULL_HANDLE;
+        VkSampler vkSampler = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         VkDescriptorImageInfo imageDescriptorInfo = {};
         std::shared_ptr<void> imageData = nullptr;
@@ -579,6 +602,7 @@ namespace zen {
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         VkDeviceSize imageSize = 0;
         Image image = {};
+        TextureSampler sampler = {};
 
         void load(std::shared_ptr<void> imageData, VkDeviceSize imageSize, Device& device, uint32_t width,
                   uint32_t height);

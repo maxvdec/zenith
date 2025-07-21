@@ -174,7 +174,7 @@ void Texture::activateTexture(Device& device) {
 
     this->imageDescriptorInfo = {};
     imageDescriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageDescriptorInfo.sampler = sampler;
+    imageDescriptorInfo.sampler = vkSampler;
     imageDescriptorInfo.imageView = image.view;
 
     commandBuffer->endCommitAndDelete();
@@ -182,28 +182,8 @@ void Texture::activateTexture(Device& device) {
 
 
 void Texture::createSampler(Device& device) {
-    VkSamplerCreateInfo samplerInfo = {};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = device.physicalDeviceProperties.limits.maxSamplerAnisotropy;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    VkResult result = vkCreateSampler(device.logicalDevice, &samplerInfo, nullptr, &sampler);
-    if (result != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create texture sampler. Error: " + zen::getVulkanErrorString(result));
-    }
+    sampler.createSampler(device);
+    vkSampler = sampler.sampler;
 }
 
 void Texture::createDescriptorSet(Device& device, VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool) {
@@ -223,7 +203,7 @@ void Texture::createDescriptorSet(Device& device, VkDescriptorSetLayout layout, 
     VkDescriptorImageInfo imageInfo = {};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.imageView = image.view;
-    imageInfo.sampler = sampler;
+    imageInfo.sampler = vkSampler;
 
     VkWriteDescriptorSet descriptorWrite = {};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -235,6 +215,94 @@ void Texture::createDescriptorSet(Device& device, VkDescriptorSetLayout layout, 
     descriptorWrite.pImageInfo = &imageInfo;
 
     vkUpdateDescriptorSets(device.logicalDevice, 1, &descriptorWrite, 0, nullptr);
+}
+
+void TextureSampler::createSampler(const Device& device) {
+    VkFilter vkFilter;
+    switch (filter) {
+    case zen::TextureFilter::Nearest:
+        vkFilter = VK_FILTER_NEAREST;
+        break;
+    case zen::TextureFilter::Linear:
+        vkFilter = VK_FILTER_LINEAR;
+        break;
+    default:
+        vkFilter = VK_FILTER_NEAREST;
+        break;
+    }
+    VkSamplerAddressMode vkWrapS, vkWrapT, vkWrapR;
+    switch (wrapS) {
+    case zen::TextureWrap::Repeat:
+        vkWrapS = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        break;
+    case zen::TextureWrap::MirroredRepeat:
+        vkWrapS = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        break;
+    case zen::TextureWrap::ClampToEdge:
+        vkWrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        break;
+    case zen::TextureWrap::ClampToBorder:
+        vkWrapS = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        break;
+    default:
+        vkWrapS = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+    switch (wrapT) {
+    case zen::TextureWrap::Repeat:
+        vkWrapT = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        break;
+    case zen::TextureWrap::MirroredRepeat:
+        vkWrapT = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        break;
+    case zen::TextureWrap::ClampToEdge:
+        vkWrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        break;
+    case zen::TextureWrap::ClampToBorder:
+        vkWrapT = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        break;
+    default:
+        vkWrapT = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        break;
+    }
+    switch (wrapR) {
+    case zen::TextureWrap::Repeat:
+        vkWrapR = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        break;
+    case zen::TextureWrap::MirroredRepeat:
+        vkWrapR = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        break;
+    case zen::TextureWrap::ClampToEdge:
+        vkWrapR = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        break;
+    case zen::TextureWrap::ClampToBorder:
+        vkWrapR = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        break;
+    default:
+        vkWrapR = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        break;
+    }
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = vkFilter;
+    samplerInfo.minFilter = vkFilter;
+    samplerInfo.addressModeU = vkWrapS;
+    samplerInfo.addressModeV = vkWrapT;
+    samplerInfo.addressModeW = vkWrapR;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = device.physicalDeviceProperties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    VkResult result = vkCreateSampler(device.logicalDevice, &samplerInfo, nullptr, &sampler);
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create texture sampler. Error: " + zen::getVulkanErrorString(result));
+    }
 }
 
 

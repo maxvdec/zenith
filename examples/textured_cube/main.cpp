@@ -9,7 +9,9 @@
 
 #define ZENITH_VULKAN
 #include <zenith/zenith.h>
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <zenith/window.h>
 
 using namespace zen;
@@ -29,13 +31,16 @@ layout(location = 2) in vec2 inTexCoord;
 layout(set = 0, binding = 0) uniform Uniforms {
     bool enabled;
     float time;
+    mat4 modelMatrix;
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
 } ubo;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
 
 void main() {
-    gl_Position = vec4(inPosition, 1.0);
+    gl_Position = ubo.projectionMatrix * ubo.viewMatrix * ubo.modelMatrix * vec4(inPosition, 1.0);
     if (ubo.enabled) {
         fragColor = inColor * sin(ubo.time);
     } else {
@@ -59,9 +64,28 @@ void main() {
 }
 )";
 
-struct Uniforms {
-    bool enabled;
+struct alignas(16) Uniforms {
     float time;
+    bool enabled;
+    glm::mat4 modelMatrix;
+    glm::mat4 viewMatrix;
+    glm::mat4 projectionMatrix;
+};
+
+struct Model {
+    glm::vec3 position = {0, 0, 0};
+    glm::vec3 scale = {1, 1, 1};
+    glm::vec3 rotation = {0, 0, 0};
+
+    [[nodiscard]] glm::mat4 makeMatrix() const {
+        auto model = glm::mat4(1.0f);
+        model = glm::translate(model, position);
+        model = glm::scale(model, scale);
+        model = glm::rotate(model, glm::radians(rotation.x), glm::vec3(1, 0, 0));
+        model = glm::rotate(model, glm::radians(rotation.y), glm::vec3(0, 1, 0));
+        model = glm::rotate(model, glm::radians(rotation.z), glm::vec3(0, 0, 1));
+        return model;
+    }
 };
 
 int main() {
@@ -106,7 +130,7 @@ int main() {
     pipeline.shaderProgram = program;
 
     UniformBlock uniformBlock = device->makeUniformBlock(sizeof(Uniforms));
-    Uniforms uniforms{true, 0.0f};
+    Uniforms uniforms{0.0f, true};
     uniformBlock.uploadData(&uniforms);
     pipeline.attachUniformBlock(uniformBlock);
 
@@ -120,24 +144,63 @@ int main() {
 
     pipeline.makePipeline();
 
-    // We make a square
-    std::vector<Vertex> vertices(4);
-    vertices[0] = {glm::vec3(-0.5f, -0.5f, 0.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f), glm::vec2(0.0f, 0.0f)};
-    vertices[1] = {glm::vec3(0.5f, -0.5f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f), glm::vec2(1.0f, 0.0f)};
-    vertices[2] = {glm::vec3(-0.5f, 0.5f, 0.0f), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f)};
-    vertices[3] = {glm::vec3(0.5f, 0.5f, 0.0f), glm::vec4(1.0f, 1.0f, 0.0f, 1.0f), glm::vec2(1.0f, 1.0f)};
+    std::vector<Vertex> vertices = {
+        // Front face
+        {{-0.5f, -0.5f, 0.5f}, {1, 0, 0, 1}, {0.0f, 0.0f}}, // 0
+        {{0.5f, -0.5f, 0.5f}, {0, 1, 0, 1}, {1.0f, 0.0f}}, // 1
+        {{0.5f, 0.5f, 0.5f}, {0, 0, 1, 1}, {1.0f, 1.0f}}, // 2
+        {{-0.5f, 0.5f, 0.5f}, {1, 1, 0, 1}, {0.0f, 1.0f}}, // 3
+
+        // Back face
+        {{-0.5f, -0.5f, -0.5f}, {1, 0, 1, 1}, {1.0f, 0.0f}}, // 4
+        {{0.5f, -0.5f, -0.5f}, {0, 1, 1, 1}, {0.0f, 0.0f}}, // 5
+        {{0.5f, 0.5f, -0.5f}, {1, 1, 1, 1}, {0.0f, 1.0f}}, // 6
+        {{-0.5f, 0.5f, -0.5f}, {0.5f, 0.5f, 0.5f, 1}, {1.0f, 1.0f}}, // 7
+    };
 
     Buffer vertexBuffer = device->makeBuffer(vertices);
 
     std::vector<uint32_t> indices = {
-        0, 1, 2, // First triangle
-        1, 3, 2 // Second triangle
+        // Front face
+        0, 1, 2, 2, 3, 0,
+
+        // Right face
+        1, 5, 6, 6, 2, 1,
+
+        // Back face
+        5, 4, 7, 7, 6, 5,
+
+        // Left face
+        4, 0, 3, 3, 7, 4,
+
+        // Top face
+        3, 2, 6, 6, 7, 3,
+
+        // Bottom face
+        4, 5, 1, 1, 0, 4,
     };
 
     Buffer indexBuffer = device->makeBuffer(indices);
 
+    auto model = Model();
+
+    uniforms.viewMatrix = glm::lookAt(
+        glm::vec3(2.0f, 2.0f, 2.0f), // camera pos
+        glm::vec3(0.0f, 0.0f, 0.0f), // target
+        glm::vec3(0.0f, 1.0f, 0.0f) // up
+    );
+
+    uniforms.projectionMatrix = glm::perspective(
+        glm::radians(45.0f),
+        static_cast<float>(config.width) / static_cast<float>(config.height),
+        0.1f,
+        10.0f
+    );
+    uniforms.projectionMatrix[1][1] *= -1;
+
     while (!window.shouldClose()) {
         uniforms.time = glfwGetTime();
+        uniforms.modelMatrix = model.makeMatrix();
         uniformBlock.uploadData(&uniforms);
         auto commandBuffer = device->requestCommandBuffer(pipeline, presentable);
         commandBuffer->begin();
@@ -149,7 +212,7 @@ int main() {
 
         commandBuffer->bindTexture(pipeline);
 
-        commandBuffer->draw(6, true);
+        commandBuffer->draw(static_cast<int>(indices.size()), true);
 
         commandBuffer->endRendering();
         commandBuffer->end();
